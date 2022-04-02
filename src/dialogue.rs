@@ -4,6 +4,8 @@ use line::Line;
 use macroquad::prelude::*;
 use std::time::Instant;
 
+use crate::draw_text_centered;
+
 pub struct Dialogue {
     lines: Vec<Line>,
 }
@@ -46,7 +48,10 @@ impl Dialogue {
         self.color_text(text, WHITE);
     }
 
-    pub async fn render_with_events(self, mut e: impl FnMut(FrameCtx) -> Event) {
+    pub async fn render_with_opts<FN>(self, opts: &mut DialogueOpts<FN>)
+    where
+        FN: FnMut(FrameCtx) -> Event,
+    {
         let mut line_idx = 1;
         let mut char_idx = 0;
 
@@ -67,17 +72,33 @@ impl Dialogue {
 
             if let Some(line) = self.lines.get(line_idx) {
                 line.draw(timestamp, x, y, Some(char_idx));
-            } else {
-                draw_text(
-                    "<ENTER>",
+                draw_text_centered(
+                    "<SPACE> skip",
                     screen_width() / 2.0,
                     screen_height() - 50.,
                     24.,
                     WHITE,
                 );
+            } else {
+                draw_text_centered(
+                    "<ENTER> continue",
+                    screen_width() / 2.0,
+                    screen_height() - 50.,
+                    24.,
+                    WHITE,
+                );
+                if opts.intro {
+                    draw_text(
+                        "<ESC> skip intro",
+                        screen_width() - 200.,
+                        screen_height() - 50.,
+                        24.,
+                        WHITE,
+                    );
+                }
             }
 
-            let event = e(FrameCtx {
+            let event = (opts.events)(FrameCtx {
                 all_text_visible: self.lines.len() <= line_idx,
             });
             match event {
@@ -106,6 +127,14 @@ impl Dialogue {
         }
     }
 
+    pub async fn render_with_events(self, events: impl FnMut(FrameCtx) -> Event) {
+        self.render_with_opts(&mut DialogueOpts {
+            intro: false,
+            events,
+        })
+        .await;
+    }
+
     pub async fn render(self) {
         self.render_with_events(|ctx| {
             if ctx.all_text_visible {
@@ -122,6 +151,14 @@ impl Dialogue {
         })
         .await;
     }
+}
+
+pub struct DialogueOpts<FN>
+where
+    FN: FnMut(FrameCtx) -> Event,
+{
+    pub intro: bool,
+    pub events: FN,
 }
 
 pub struct FrameCtx {
