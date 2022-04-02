@@ -6,6 +6,7 @@ use macroquad::prelude::{RED, YELLOW};
 pub enum Event {
     Visitor { who: Visitor, outcome: Outcome },
     UnlockFarm,
+    Headache,
     Nothing,
 }
 
@@ -13,6 +14,8 @@ pub enum Event {
 pub enum Item {
     Seeds,
     RawPotato,
+    CookedPotato,
+    CanOfBeans,
 }
 
 impl Item {
@@ -20,6 +23,8 @@ impl Item {
         match self {
             Self::Seeds => "Potato seeds",
             Self::RawPotato => "Raw potato",
+            Self::CookedPotato => "Cooked potato",
+            Self::CanOfBeans => "Can of beans",
         }
     }
 }
@@ -60,6 +65,17 @@ impl Event {
                 .await;
                 outcome
             }
+            Event::Headache => {
+                Dialogue::show(|d| {
+                    d.page(state.page);
+                    d.text("Woke up with a massive headache.");
+                    d.text("Not going to be able to work today.");
+                    d.text("");
+                    d.text("The worst part about a nuclear war is the lack of painkillers.");
+                })
+                .await;
+                Outcome::SkipDay
+            }
             Event::UnlockFarm => {
                 let outcome = Outcome::UnlockFarm;
                 Dialogue::show(|d| {
@@ -78,8 +94,8 @@ impl Event {
         outcome.apply(state);
     }
 
-    pub fn can_farm(&self) -> bool {
-        true
+    pub fn can_execute_action(&self) -> bool {
+        !matches!(self, Event::Headache)
     }
 }
 
@@ -88,6 +104,7 @@ pub enum Outcome {
     RenerateHealth(u32),
     GainItem(Item),
     UnlockFarm,
+    SkipDay,
 }
 
 impl Outcome {
@@ -100,7 +117,10 @@ impl Outcome {
             }
             Outcome::GainItem(Item::Seeds) => d.color_text("Got potato seeds!", YELLOW),
             Outcome::GainItem(Item::RawPotato) => d.color_text("Got a raw potato!", YELLOW),
+            Outcome::GainItem(Item::CookedPotato) => d.color_text("Got a cooked potato!", YELLOW),
+            Outcome::GainItem(Item::CanOfBeans) => d.color_text("Got a can of beans!", YELLOW),
             Outcome::UnlockFarm => d.jiggle_color_text("Unlocked farm!", YELLOW),
+            Outcome::SkipDay => {}
         }
     }
 
@@ -109,6 +129,7 @@ impl Outcome {
             Outcome::RenerateHealth(health) => state.health.add(health),
             Outcome::GainItem(item) => state.inventory.add(item),
             Outcome::UnlockFarm => state.farm = Some(Farm::default()),
+            Outcome::SkipDay => {}
         }
     }
 }

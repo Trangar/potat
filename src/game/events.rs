@@ -15,6 +15,11 @@ static EVENTS: &[E] = &[
         condition: |state| state.day_delta() == 2,
         chance: 1.0,
     },
+    E {
+        event: Event::Headache,
+        condition: |_| true,
+        chance: 0.05,
+    },
 ];
 
 pub struct E {
