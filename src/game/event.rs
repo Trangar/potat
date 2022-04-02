@@ -53,7 +53,7 @@ impl Event {
                 let outcome = Outcome::RenerateHealth(10);
                 Dialogue::show(|d| {
                     d.page(state.page);
-                    d.text("You had an uneventful sleep.");
+                    d.text("I had an uneventful sleep.");
                     d.text("How refreshing.");
                     outcome.dialogue(state, d);
                 })
@@ -100,7 +100,7 @@ impl Outcome {
             }
             Outcome::GainItem(Item::Seeds) => d.color_text("Got potato seeds!", YELLOW),
             Outcome::GainItem(Item::RawPotato) => d.color_text("Got a raw potato!", YELLOW),
-            Outcome::UnlockFarm => d.jiggle_color_text("Unlocked farm", YELLOW),
+            Outcome::UnlockFarm => d.jiggle_color_text("Unlocked farm!", YELLOW),
         }
     }
 

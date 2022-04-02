@@ -4,8 +4,8 @@ mod events;
 pub use event::*;
 pub use events::*;
 
-use crate::{assets::Assets, draw_text_centered, farm::Farm};
-use ::rand::{thread_rng, RngCore};
+use crate::{assets::Assets, farm::Farm};
+use ::rand::{thread_rng, Rng, RngCore};
 use macroquad::prelude::*;
 
 pub struct State {
@@ -26,7 +26,7 @@ impl State {
             page: start_page,
             inventory: Inventory::default(),
             health: Stat::new(50),
-            food: Stat::new(200),
+            food: Stat::new(100),
             farm: None,
         }
     }
@@ -36,6 +36,7 @@ impl State {
 
     pub fn end_of_day(&mut self) {
         self.page += 1;
+        self.food.subn(self.rng.gen_range(5..20));
         if let Some(farm) = &mut self.farm {
             farm.end_of_day();
         }
@@ -55,26 +56,8 @@ impl State {
             draw_text(&format!("Day {}", self.page), x, y, 40., WHITE);
             y += 80.;
 
-            if !self.health.is_max() {
-                draw_text(
-                    &format!("Health: {}/{}", self.health.current, self.health.max),
-                    x,
-                    y,
-                    30.,
-                    WHITE,
-                );
-                y += 35.;
-            }
-            if !self.food.is_max() {
-                draw_text(
-                    &format!("Food: {}/{}", self.food.current, self.food.max),
-                    x,
-                    y,
-                    30.,
-                    WHITE,
-                );
-                y += 35.;
-            }
+            y += self.health.draw_if_not_full("Health", x, y);
+            y += self.food.draw_if_not_full("Food", x, y);
 
             if !self.inventory.items.is_empty() {
                 draw_text("Inventory", x, y, 30., WHITE);
@@ -106,33 +89,7 @@ impl State {
             }
 
             if is_key_pressed(KeyCode::Escape) {
-                next_frame().await;
-                loop {
-                    clear_background(BLACK);
-                    draw_text_centered(
-                        "Do you want to quit?",
-                        screen_width() / 2.,
-                        300.,
-                        50.,
-                        WHITE,
-                    );
-                    draw_text_centered("<Esc> no", screen_width() / 2., 350., 50., WHITE);
-                    draw_text_centered("<Enter> yes", screen_width() / 2., 400., 50., WHITE);
-                    draw_text(
-                        "Note: Saving is not implemented yet. You'll have to start from scratch",
-                        50.,
-                        500.,
-                        30.,
-                        WHITE,
-                    );
-                    if is_key_pressed(KeyCode::Enter) {
-                        std::process::exit(0);
-                    }
-                    if is_key_pressed(KeyCode::Escape) {
-                        break;
-                    }
-                    next_frame().await;
-                }
+                crate::quit_dialogue().await;
             }
 
             next_frame().await;
@@ -199,15 +156,15 @@ impl Stat {
     // 	self.subn(1)
     // }
 
-    // pub fn subn(&mut self, count: u32) -> bool {
-    // 	if self.current > count {
-    // 		self.current -= count;
-    // 		true
-    // 	} else {
-    // 		self.current = 0;
-    // 		false
-    // 	}
-    // }
+    pub fn subn(&mut self, count: u32) -> bool {
+        if self.current > count {
+            self.current -= count;
+            true
+        } else {
+            self.current = 0;
+            false
+        }
+    }
 
     fn can_add(&self, count: u32) -> Option<u32> {
         if self.current == self.max {
@@ -219,5 +176,24 @@ impl Stat {
 
     fn is_max(&self) -> bool {
         self.current == self.max
+    }
+
+    fn draw_if_not_full(&self, label: &str, x: f32, y: f32) -> f32 {
+        if self.is_max() {
+            return 0.0;
+        }
+        draw_text(label, x, y, 30., WHITE);
+        draw_rectangle_lines(x + 100., y - 22.5, 200., 30., 5., WHITE);
+
+        let ratio = self.current as f32 / self.max as f32;
+        let color = if ratio < 0.1 {
+            RED
+        } else if ratio < 0.3 {
+            ORANGE
+        } else {
+            WHITE
+        };
+        draw_rectangle(x + 105., y - 17.5, ratio * 190., 20., color);
+        35.
     }
 }

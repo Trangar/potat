@@ -123,3 +123,33 @@ fn draw_text_centered(text: &str, x: f32, y: f32, font_size: f32, color: Color) 
     let size = measure_text(text, None, font_size as u16, 1.0);
     draw_text(text, x - size.width / 2., y, font_size, color);
 }
+
+pub async fn quit_dialogue() {
+    next_frame().await;
+    loop {
+        clear_background(BLACK);
+        draw_text_centered(
+            "Do you want to quit?",
+            screen_width() / 2.,
+            300.,
+            50.,
+            WHITE,
+        );
+        draw_text_centered("<Esc> no", screen_width() / 2., 350., 50., WHITE);
+        draw_text_centered("<Enter> yes", screen_width() / 2., 400., 50., WHITE);
+        draw_text(
+            "Note: Saving is not implemented yet. You'll have to start from scratch",
+            50.,
+            500.,
+            30.,
+            WHITE,
+        );
+        if is_key_pressed(KeyCode::Enter) {
+            std::process::exit(0);
+        }
+        if is_key_pressed(KeyCode::Escape) {
+            break;
+        }
+        next_frame().await;
+    }
+}

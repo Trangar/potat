@@ -102,7 +102,7 @@ impl Farm {
 
             if py < 150. && px < 64. {
                 draw_text_centered(
-                    "<Enter> End day",
+                    "<Enter> end day",
                     screen_width() / 2.0,
                     screen_height() - 10.,
                     40.,
@@ -114,8 +114,15 @@ impl Farm {
             }
 
             if let Some((x, y, tile)) = self.get_hover_tile((px, py), facing, state) {
-                // dbg!(x, y, tile);
                 if let Some(action_name) = tile.action_name() {
+                    draw_rectangle_lines(
+                        (x + FARM_START.0) as f32 * TILE_PX,
+                        (y + FARM_START.1) as f32 * TILE_PX,
+                        TILE_PX,
+                        TILE_PX,
+                        2.0,
+                        RED,
+                    );
                     draw_text_centered(
                         &format!("<Enter> {}", action_name),
                         screen_width() / 2.0,
@@ -129,6 +136,9 @@ impl Farm {
                 }
             }
 
+            if is_key_pressed(KeyCode::Escape) {
+                crate::quit_dialogue().await;
+            }
             next_frame().await;
         }
     }
@@ -156,14 +166,14 @@ impl Farm {
         let max_x = (max_x.max(0) as usize).min(SIZE);
         let max_y = (max_y.max(0) as usize).min(SIZE);
 
-        draw_rectangle_lines(
-            (min_x + FARM_START.0) as f32 * TILE_PX,
-            (min_y + FARM_START.1) as f32 * TILE_PX,
-            (max_x - min_x) as f32 * TILE_PX,
-            (max_y - min_y) as f32 * TILE_PX,
-            1.0,
-            BLACK,
-        );
+        // draw_rectangle_lines(
+        //     (min_x + FARM_START.0) as f32 * TILE_PX,
+        //     (min_y + FARM_START.1) as f32 * TILE_PX,
+        //     (max_x - min_x) as f32 * TILE_PX,
+        //     (max_y - min_y) as f32 * TILE_PX,
+        //     1.0,
+        //     BLACK,
+        // );
 
         let mut most_significant: Option<(usize, usize, &Tile)> = None;
         for x in min_x..max_x {
