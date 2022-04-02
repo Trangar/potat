@@ -3,6 +3,7 @@ use crate::{
     draw_text_centered,
     game::{Item, State},
 };
+use ::rand::Rng;
 use macroquad::prelude::*;
 
 const SIZE: usize = 10;
@@ -201,8 +202,11 @@ impl Farm {
     fn execute(&mut self, x: usize, y: usize, state: &mut State) {
         match &self.tiles[x][y] {
             Tile::Potato { age: 3 } => {
-                state.inventory.add(Item::Seeds);
                 state.inventory.add(Item::RawPotato);
+                state.inventory.add(Item::Seeds);
+                if state.rng.gen_bool(0.5) {
+                    state.inventory.add(Item::Seeds);
+                }
                 self.tiles[x][y] = Tile::Dirt;
             }
             Tile::Dirt if state.inventory.count(Item::Seeds) > 0 => {

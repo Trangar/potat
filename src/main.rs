@@ -4,7 +4,7 @@ mod farm;
 mod game;
 
 use assets::Assets;
-use dialogue::{Dialogue, DialogueOpts, Event};
+use dialogue::{Dialogue, DialogueOpts, Event, FrameCtx};
 use game::{DayAction, Item, State};
 use macroquad::prelude::*;
 
@@ -48,8 +48,7 @@ async fn main() {
 async fn intro() -> State {
     let mut skip_intro = false;
     let mut opts = DialogueOpts {
-        intro: true,
-        events: |ctx| {
+        events: Some(|ctx: FrameCtx| {
             if skip_intro {
                 Event::Done
             } else if is_key_pressed(KeyCode::Escape) {
@@ -66,7 +65,9 @@ async fn intro() -> State {
             } else {
                 Event::NextChar
             }
-        },
+        }),
+        intro: true,
+        ..Default::default()
     };
     Dialogue::new(|d| {
         d.page(1);

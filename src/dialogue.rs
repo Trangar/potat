@@ -84,13 +84,15 @@ impl Dialogue {
                     WHITE,
                 );
             } else {
-                draw_text_centered(
-                    "<ENTER> continue",
-                    screen_width() / 2.0,
-                    screen_height() - 50.,
-                    24.,
-                    WHITE,
-                );
+                if opts.enable_enter_continue {
+                    draw_text_centered(
+                        "<ENTER> continue",
+                        screen_width() / 2.0,
+                        screen_height() - 50.,
+                        24.,
+                        WHITE,
+                    );
+                }
                 if opts.intro {
                     draw_text(
                         "<ESC> skip intro",
@@ -102,7 +104,7 @@ impl Dialogue {
                 }
             }
 
-            let event = (opts.events)(FrameCtx {
+            let event = (opts.events.as_mut().unwrap())(FrameCtx {
                 all_text_visible: self.lines.len() <= line_idx,
             });
             match event {
@@ -133,8 +135,8 @@ impl Dialogue {
 
     pub async fn render_with_events(self, events: impl FnMut(FrameCtx) -> Event) {
         self.render_with_opts(&mut DialogueOpts {
-            intro: false,
-            events,
+            events: Some(events),
+            ..Default::default()
         })
         .await;
     }
@@ -161,8 +163,24 @@ pub struct DialogueOpts<FN>
 where
     FN: FnMut(FrameCtx) -> Event,
 {
+    pub enable_enter_continue: bool,
     pub intro: bool,
-    pub events: FN,
+    pub events: Option<FN>,
+    pub post_render: Option<fn()>,
+}
+
+impl<FN> Default for DialogueOpts<FN>
+where
+    FN: FnMut(FrameCtx) -> Event,
+{
+    fn default() -> Self {
+        Self {
+            enable_enter_continue: true,
+            intro: false,
+            events: None,
+            post_render: None,
+        }
+    }
 }
 
 pub struct FrameCtx {
