@@ -1,10 +1,11 @@
 use macroquad::prelude::*;
 
-use crate::game::State;
+use crate::{assets::Assets, game::State};
 
-const SIZE: usize = 20;
+const SIZE: usize = 10;
 const POTATO_MATURE_AGE: u8 = 3;
 const TILE_PX: f32 = 50.;
+const PLAYER_SPEED: f32 = 2.;
 
 pub struct Farm {
     pub tiles: [[Tile; SIZE]; SIZE],
@@ -43,14 +44,32 @@ impl Farm {
         }
     }
 
-    pub async fn draw(&mut self, _state: &mut State) {
+    pub async fn draw(&mut self, _state: &mut State, assets: &Assets) {
+        let mut px = 150.0;
+        let mut py = 50.0;
         loop {
-            clear_background(BLACK);
+            clear_background(DARKGREEN);
             for (y, col) in self.tiles.iter().enumerate() {
                 for (x, tile) in col.iter().enumerate() {
-                    tile.draw_at(x as f32 * TILE_PX, y as f32 * TILE_PX);
+                    tile.draw_at(200. + x as f32 * TILE_PX, 50. + y as f32 * TILE_PX);
                 }
             }
+            draw_texture(assets.farmer_front, px, py, WHITE);
+
+            if is_key_down(KeyCode::D) || is_key_down(KeyCode::Right) {
+                px += PLAYER_SPEED;
+            }
+            if is_key_down(KeyCode::A) || is_key_down(KeyCode::Left) {
+                px -= PLAYER_SPEED;
+            }
+            if is_key_down(KeyCode::S) || is_key_down(KeyCode::Down) {
+                py += PLAYER_SPEED;
+            }
+            if is_key_down(KeyCode::W) || is_key_down(KeyCode::Up) {
+                py -= PLAYER_SPEED;
+            }
+            px = px.max(0.0).min(screen_width() - 32.);
+            py = py.max(0.0).min(screen_height() - 64.);
             next_frame().await;
         }
     }

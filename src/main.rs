@@ -1,13 +1,17 @@
+mod assets;
 mod dialogue;
 mod farm;
 mod game;
 
+use assets::Assets;
 use dialogue::{Dialogue, DialogueOpts, Event};
 use game::{DayAction, Item, State};
 use macroquad::prelude::*;
 
 #[macroquad::main("Potat")]
 async fn main() {
+    let assets = Assets::new().await;
+
     #[cfg(not(debug_assertions))]
     let mut state = intro().await;
     #[cfg(debug_assertions)]
@@ -28,10 +32,10 @@ async fn main() {
     loop {
         let event = game::next_event(&state);
         event.dialogue(&mut state).await;
-        match state.draw(event).await {
+        match state.draw(event, &assets).await {
             DayAction::Farm => {
                 if let Some(mut farm) = state.farm.take() {
-                    farm.draw(&mut state).await;
+                    farm.draw(&mut state, &assets).await;
                     state.farm = Some(farm);
                 }
             }

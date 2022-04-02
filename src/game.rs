@@ -4,7 +4,7 @@ mod events;
 pub use event::*;
 pub use events::*;
 
-use crate::{draw_text_centered, farm::Farm};
+use crate::{assets::Assets, draw_text_centered, farm::Farm};
 use ::rand::{thread_rng, RngCore};
 use macroquad::prelude::*;
 
@@ -45,7 +45,7 @@ impl State {
         self.farm.is_some()
     }
 
-    pub async fn draw(&self, last_event: Event) -> DayAction {
+    pub async fn draw(&self, last_event: Event, _assets: &Assets) -> DayAction {
         next_frame().await;
         loop {
             clear_background(BLACK);
