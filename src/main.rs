@@ -1,16 +1,47 @@
 mod dialogue;
+mod farm;
 mod game;
 
 use dialogue::{Dialogue, DialogueOpts, Event};
-use game::State;
+use game::{DayAction, Item, State};
 use macroquad::prelude::*;
 
 #[macroquad::main("Potat")]
 async fn main() {
-    while !is_key_pressed(KeyCode::Enter) {
+    #[cfg(not(debug_assertions))]
+    let mut state = intro().await;
+    #[cfg(debug_assertions)]
+    let mut state = loop {
         clear_background(BLACK);
         next_frame().await;
+        if is_key_pressed(KeyCode::Enter) {
+            break intro().await;
+        }
+        if is_key_pressed(KeyCode::F1) {
+            let mut state = State::new(5);
+            state.inventory.add(Item::Seeds);
+            state.page = 7;
+            break state;
+        }
+    };
+
+    loop {
+        let event = game::next_event(&state);
+        event.dialogue(&mut state).await;
+        match state.draw(event).await {
+            DayAction::Farm => {
+                if let Some(mut farm) = state.farm.take() {
+                    farm.draw(&mut state).await;
+                    state.farm = Some(farm);
+                }
+            }
+            DayAction::Next => {}
+        }
+        state.end_of_day();
     }
+}
+
+async fn intro() -> State {
     let mut skip_intro = false;
     let mut opts = DialogueOpts {
         intro: true,
@@ -34,7 +65,7 @@ async fn main() {
         },
     };
     Dialogue::new(|d| {
-        d.big_text("Day 0");
+        d.page(1);
         d.text("Uh. Dear diary? I guess?");
         d.text("Today was shit.");
         d.text("I was in my potato field like normal, when the sirens started ringing.");
@@ -49,7 +80,7 @@ async fn main() {
     .await;
 
     Dialogue::new(|d| {
-        d.big_text("Day 1");
+        d.page(2);
         d.text("Still stuck in the bunker.");
         d.text("");
         d.text("Oh right, dear diary.");
@@ -64,28 +95,24 @@ async fn main() {
     .await;
 
     Dialogue::new(|d| {
-        d.big_text("Day 3");
+        d.page(3);
         d.text("At least I've been able to catch up on sleep.");
     })
     .render_with_opts(&mut opts)
     .await;
 
     Dialogue::new(|d| {
-        d.big_text("Day 5");
+        d.page(4);
         d.text("I'm so bored.");
-        d.text("Tomorrow I'll go outside.");
+        d.text("Tomorrow I'll go back to my barn.");
         d.text("I'd rather die of radiation than sit in here for the rest of my life.");
+        d.text("");
+        d.text("I need some coffee.");
     })
     .render_with_opts(&mut opts)
     .await;
 
-    let mut state = State::default();
-    loop {
-        let event = game::next_event(&state);
-        event.dialogue(&mut state).await;
-        state.draw().await;
-        state.day += 1;
-    }
+    State::new(5)
 }
 
 fn draw_text_centered(text: &str, x: f32, y: f32, font_size: f32, color: Color) {

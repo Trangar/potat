@@ -1,19 +1,12 @@
+use super::State;
+use crate::{dialogue::Dialogue, farm::Farm};
 use macroquad::prelude::{RED, YELLOW};
 
-use crate::dialogue::Dialogue;
-
-use super::State;
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum EventType {
+pub enum Event {
     Visitor { who: Visitor, outcome: Outcome },
+    UnlockFarm,
     Nothing,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Outcome {
-    RenerateHealth(u32),
-    GainItem(Item),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -34,31 +27,45 @@ pub enum Visitor {
     OldFriend,
 }
 
-impl EventType {
-    pub async fn dialogue(self, state: &mut State) {
+impl Event {
+    pub async fn dialogue(&self, state: &mut State) {
         let outcome = match self {
-            EventType::Visitor {
+            Event::Visitor {
                 who: Visitor::OldFriend,
                 outcome,
             } => {
                 Dialogue::show(|d| {
-                    d.big_text(format!("Day {}", state.day));
-                    d.text("A knock on the door.");
-                    d.text("It's an old friend!");
-                    d.text("You share some stories.");
+                    d.page(state.page);
+                    d.text("I went back to my barn.");
+                    d.text("I saw Greg!");
+                    d.text("We shared some stories.");
                     d.text("");
-                    d.text("He gave you some potato seeds.");
+                    d.text("He gave me some potato seeds.");
+                    d.text("Maybe these will come in handy.");
+                    outcome.dialogue(state, d);
+                })
+                .await;
+                *outcome
+            }
+            Event::Nothing => {
+                let outcome = Outcome::RenerateHealth(10);
+                Dialogue::show(|d| {
+                    d.page(state.page);
+                    d.text("You had an uneventful sleep.");
+                    d.text("How refreshing.");
                     outcome.dialogue(state, d);
                 })
                 .await;
                 outcome
             }
-            EventType::Nothing => {
-                let outcome = Outcome::RenerateHealth(10);
+            Event::UnlockFarm => {
+                let outcome = Outcome::UnlockFarm;
                 Dialogue::show(|d| {
-                    d.big_text(format!("Day {}", state.day));
-                    d.text("You had an uneventful sleep.");
-                    d.text("How refreshing.");
+                    d.page(state.page);
+                    d.text("I'm so tired of sitting inside all day.");
+                    d.text("And my food is starting to get low.");
+                    d.text("");
+                    d.text("I should go farm some potatoes.");
                     outcome.dialogue(state, d);
                 })
                 .await;
@@ -68,6 +75,17 @@ impl EventType {
 
         outcome.apply(state);
     }
+
+    pub fn can_farm(&self) -> bool {
+        true
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Outcome {
+    RenerateHealth(u32),
+    GainItem(Item),
+    UnlockFarm,
 }
 
 impl Outcome {
@@ -79,6 +97,7 @@ impl Outcome {
                 }
             }
             Outcome::GainItem(Item::Seeds) => d.color_text("Got potato seeds!", YELLOW),
+            Outcome::UnlockFarm => d.jiggle_color_text("Unlocked farm", YELLOW),
         }
     }
 
@@ -86,6 +105,7 @@ impl Outcome {
         match self {
             Outcome::RenerateHealth(health) => state.health.add(health),
             Outcome::GainItem(item) => state.inventory.add(item),
+            Outcome::UnlockFarm => state.farm = Some(Farm::default()),
         }
     }
 }

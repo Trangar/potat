@@ -1,45 +1,58 @@
-mod event_type;
+mod event;
 mod events;
 
-use ::rand::{thread_rng, RngCore};
-pub use event_type::*;
+pub use event::*;
 pub use events::*;
-use macroquad::prelude::*;
 
-use crate::draw_text_centered;
+use crate::{draw_text_centered, farm::Farm};
+use ::rand::{thread_rng, RngCore};
+use macroquad::prelude::*;
 
 pub struct State {
     pub rng: Box<dyn RngCore>,
     pub inventory: Inventory,
-    pub day: u32,
+    pub start_page: u32,
+    pub page: u32,
     pub health: Stat,
     pub food: Stat,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            rng: Box::new(thread_rng()),
-            day: 6,
-            inventory: Inventory::default(),
-            health: Stat::new(50),
-            food: Stat::new(200),
-        }
-    }
+    pub farm: Option<Farm>,
 }
 
 impl State {
+    pub fn new(start_page: u32) -> Self {
+        Self {
+            rng: Box::new(thread_rng()),
+            start_page,
+            page: start_page,
+            inventory: Inventory::default(),
+            health: Stat::new(50),
+            food: Stat::new(200),
+            farm: None,
+        }
+    }
     pub fn day_delta(&self) -> u32 {
-        self.day - 6
+        self.page - self.start_page
     }
 
-    pub async fn draw(&self) {
+    pub fn end_of_day(&mut self) {
+        self.page += 1;
+        if let Some(farm) = &mut self.farm {
+            farm.end_of_day();
+        }
+    }
+
+    fn can_farm(&self) -> bool {
+        self.farm.is_some()
+    }
+
+    pub async fn draw(&self, last_event: Event) -> DayAction {
+        next_frame().await;
         loop {
             clear_background(BLACK);
 
             let x = 50.;
             let mut y = 50.;
-            draw_text(&format!("Day {}", self.day), x, y, 40., WHITE);
+            draw_text(&format!("Day {}", self.page), x, y, 40., WHITE);
             y += 80.;
 
             if !self.health.is_max() {
@@ -79,7 +92,18 @@ impl State {
             let _ = y;
 
             draw_text("<Esc> exit", 50., screen_height() - 50., 24., WHITE);
-            draw_text("<N> next day", 200., screen_height() - 50., 24., WHITE);
+
+            if self.can_farm() && last_event.can_farm() {
+                draw_text("<Enter> tend farm", 200., screen_height() - 50., 24., WHITE);
+                if is_key_pressed(KeyCode::Enter) {
+                    return DayAction::Farm;
+                }
+            } else {
+                draw_text("<Enter> Next day", 200., screen_height() - 50., 24., WHITE);
+                if is_key_pressed(KeyCode::Enter) {
+                    return DayAction::Next;
+                }
+            }
 
             if is_key_pressed(KeyCode::Escape) {
                 next_frame().await;
@@ -94,6 +118,13 @@ impl State {
                     );
                     draw_text_centered("<Esc> no", screen_width() / 2., 350., 50., WHITE);
                     draw_text_centered("<Enter> yes", screen_width() / 2., 400., 50., WHITE);
+                    draw_text(
+                        "Note: Saving is not implemented yet. You'll have to start from scratch",
+                        50.,
+                        500.,
+                        30.,
+                        WHITE,
+                    );
                     if is_key_pressed(KeyCode::Enter) {
                         std::process::exit(0);
                     }
@@ -103,13 +134,15 @@ impl State {
                     next_frame().await;
                 }
             }
-            if is_key_pressed(KeyCode::N) {
-                return;
-            }
 
             next_frame().await;
         }
     }
+}
+
+pub enum DayAction {
+    Farm,
+    Next,
 }
 
 #[derive(Default)]

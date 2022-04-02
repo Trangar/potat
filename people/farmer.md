@@ -1,0 +1,3 @@
+- Likes coffee
+- Is a potato farmer
+- not used to writing diaries

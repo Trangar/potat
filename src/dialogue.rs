@@ -48,6 +48,10 @@ impl Dialogue {
         self.color_text(text, WHITE);
     }
 
+    pub fn page(&mut self, page: u32) {
+        self.big_text(format!("Page {}", page));
+    }
+
     pub async fn render_with_opts<FN>(self, opts: &mut DialogueOpts<FN>)
     where
         FN: FnMut(FrameCtx) -> Event,
