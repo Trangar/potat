@@ -33,10 +33,10 @@ jobs:
     - name: Collect artifacts
       run: |
         set -ex
-        mkdir gametest
-        mv target/release/gametest gametest/
-        mv assets gametest/
-        zip Linux.zip -r gametest
+        mkdir potat
+        mv target/release/potat potat/
+        mv assets potat/
+        zip Linux.zip -r potat
       if: startsWith(github.ref, 'refs/tags/')
 
     - name: Upload artifact

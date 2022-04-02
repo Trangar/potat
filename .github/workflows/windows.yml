@@ -26,10 +26,10 @@ jobs:
 
     - name: Collect artifacts
       run: |
-        mkdir gametest
-        mv target/release/gametest.exe gametest/
-        mv assets gametest/
-        Compress-Archive -DestinationPath Windows.zip -Path gametest
+        mkdir potat
+        mv target/release/potat.exe potat/
+        mv assets potat/
+        Compress-Archive -DestinationPath Windows.zip -Path potat
       if: startsWith(github.ref, 'refs/tags/')
 
     - name: Upload artifact
