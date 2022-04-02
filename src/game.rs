@@ -160,6 +160,26 @@ impl Inventory {
         }
         self.items.push((item, 1));
     }
+
+    pub fn count(&self, item: Item) -> usize {
+        self.items
+            .iter()
+            .filter_map(|(i, count)| if i == &item { Some(*count) } else { None })
+            .next()
+            .unwrap_or_default()
+    }
+
+    pub fn remove(&mut self, item: Item) -> bool {
+        if let Some(idx) = self.items.iter().position(|(i, _)| i == &item) {
+            self.items[idx].1 -= 1;
+            if self.items[idx].1 == 0 {
+                self.items.remove(idx);
+            }
+            true
+        } else {
+            false
+        }
+    }
 }
 
 pub struct Stat {

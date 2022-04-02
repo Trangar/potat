@@ -12,12 +12,14 @@ pub enum Event {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Item {
     Seeds,
+    RawPotato,
 }
 
 impl Item {
     pub fn name(&self) -> &str {
         match self {
             Self::Seeds => "Potato seeds",
+            Self::RawPotato => "Raw potato",
         }
     }
 }
@@ -97,6 +99,7 @@ impl Outcome {
                 }
             }
             Outcome::GainItem(Item::Seeds) => d.color_text("Got potato seeds!", YELLOW),
+            Outcome::GainItem(Item::RawPotato) => d.color_text("Got a raw potato!", YELLOW),
             Outcome::UnlockFarm => d.jiggle_color_text("Unlocked farm", YELLOW),
         }
     }

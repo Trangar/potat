@@ -2,12 +2,14 @@ use macroquad::prelude::{load_image, Color, Texture2D, WHITE};
 
 pub struct Assets {
     pub farmer_front: Texture2D,
+    pub farm: Texture2D,
 }
 
 impl Assets {
     pub async fn new() -> Self {
         let farmer_front = load_image_transparent_color("assets/farmer_front.png", WHITE).await;
-        Self { farmer_front }
+        let farm = load_image_transparent_color("assets/farm.png", WHITE).await;
+        Self { farmer_front, farm }
     }
 }
 
