@@ -1,6 +1,7 @@
-use super::{Cat, CatState, Farm, Item, State};
+use super::{Cat, CatState, Farm, Item, State, Tile};
 use crate::dialogue::{Dialogue, DialogueBuilder, Prompt};
 use macroquad::prelude::{DARKGREEN, RED, YELLOW};
+use rand::Rng;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Event {
@@ -9,6 +10,7 @@ pub enum Event {
     Headache,
     Raiders,
     CatVisit,
+    Mice,
     Nothing,
 }
 
@@ -51,6 +53,24 @@ impl Event {
                 })
                 .await;
                 outcome
+            }
+            Event::Mice => {
+                Dialogue::show(|d| {
+                    d.page(state.page);
+                    if state.cat.get().is_some() {
+                        d.text("I saw the cat play with some dead mice this morning.");
+                        d.text("Disgusting.");
+                    } else {
+                        d.jiggle_color_text("Some of my potatoes have been eaten by mice!", RED);
+                        d.text("This is a disaster...");
+                    }
+                })
+                .await;
+                if state.cat.get().is_some() {
+                    Outcome::Nothing
+                } else {
+                    Outcome::LosePotatoes
+                }
             }
             Event::Headache => {
                 Dialogue::show(|d| {
@@ -147,6 +167,7 @@ pub enum Outcome {
     LoseItem(Item, usize),
     LoseHealth(u32),
     GainCat(bool),
+    LosePotatoes,
     UnlockFarm,
     SkipDay,
     Nothing,
@@ -183,10 +204,11 @@ impl Outcome {
             Outcome::LoseHealth(_) => {
                 d.color_text("<You lost health>", RED);
             }
-            Outcome::GainCat(_) => {}
             Outcome::UnlockFarm => {
                 d.jiggle_color_text("Unlocked farm!", YELLOW);
             }
+            Outcome::GainCat(_) => {}
+            Outcome::LosePotatoes => {}
             Outcome::SkipDay => {}
             Outcome::Nothing => {}
         }
@@ -201,6 +223,17 @@ impl Outcome {
             Outcome::LoseHealth(health) => {
                 if !state.health.subn(health) {
                     state.is_dead = true;
+                }
+            }
+            Outcome::LosePotatoes => {
+                if let Some(farm) = state.farm.as_mut() {
+                    farm.for_each(|_, _, tile| {
+                        if let Tile::Potato { .. } = tile {
+                            if state.rng.gen_bool(0.5) {
+                                *tile = Tile::Dirt;
+                            }
+                        }
+                    });
                 }
             }
             Outcome::SkipDay => {}

@@ -26,6 +26,11 @@ static EVENTS: &[E] = &[
         chance: 0.1,
     },
     E {
+        event: Event::Mice,
+        condition: |s| s.farm.is_some() && s.cat.has_visited(),
+        chance: 0.05,
+    },
+    E {
         event: Event::Headache,
         condition: |_| true,
         chance: 0.05,

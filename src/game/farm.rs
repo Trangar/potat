@@ -314,6 +314,14 @@ impl Farm {
             }
         }
     }
+
+    pub fn for_each(&mut self, mut cb: impl FnMut(usize, usize, &mut Tile)) {
+        for x in 0..SIZE {
+            for y in 0..SIZE {
+                cb(x, y, &mut self.tiles[x][y]);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
