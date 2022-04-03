@@ -5,7 +5,7 @@ use rand::Rng;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Event {
-    Visitor { who: Visitor, outcome: Outcome },
+    Visitor(Visitor),
     UnlockFarm,
     Headache,
     Raiders,
@@ -17,15 +17,13 @@ pub enum Event {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Visitor {
     OldFriend,
+    Trader,
 }
 
 impl Event {
     pub async fn dialogue(&self, state: &mut State) {
-        let outcome = match self {
-            Event::Visitor {
-                who: Visitor::OldFriend,
-                outcome,
-            } => {
+        match self {
+            Event::Visitor(Visitor::OldFriend) => {
                 Dialogue::show(|d| {
                     d.page(state.page);
                     d.text("I went back to my barn.");
@@ -34,25 +32,59 @@ impl Event {
                     d.text("");
                     d.text("He gave me some potato seeds.");
                     d.text("Maybe these will come in handy.");
-                    outcome.dialogue(state, d);
+                    d.color_text("Got 10 seeds", YELLOW);
                 })
                 .await;
-                *outcome
+                state.inventory.add(Item::Seeds, 10);
+            }
+            Event::Visitor(Visitor::Trader) => {
+                let potatoes = state.inventory.count(Item::CookedPotato);
+                let choice = Prompt::show(|d| {
+                    d.page(state.page);
+                    d.text("A trader showed up today.");
+                    if potatoes < 10 {
+                        d.text("But I didn't have enough...");
+                        d.skippable();
+                    }
+                    if potatoes > 10 {
+                        d.add_option("10 potato seeds for 10 cooked potatoes")
+                            .text("I traded some potatoes for some seeds.")
+                            .text("Time to plant some more I guess.");
+                    }
+                    if potatoes > 500 {
+                        d.add_option("a gun for 500 potatoes")
+                            .text("He had a gun for trade, but wanted a huge amount of potatoes")
+                            .text("Long story short I can defend myself now.");
+                    }
+                })
+                .await;
+                match choice {
+                    1 => {
+                        if !state.inventory.try_remove(Item::CookedPotato, 10) {
+                            eprintln!("Could not buy; not enough potatoes");
+                        }
+                        state.inventory.add(Item::Seeds, 10);
+                    }
+                    2 => {
+                        if !state.inventory.try_remove(Item::CookedPotato, 500) {
+                            eprintln!("Could not buy; not enough potatoes");
+                        }
+                        state.inventory.add(Item::Gun, 1);
+                    }
+                    _ => {}
+                }
             }
             Event::Nothing => {
-                let outcome = if state.food.is_max() {
-                    Outcome::RenerateHealth(1)
-                } else {
-                    Outcome::Nothing
-                };
                 Dialogue::show(|d| {
                     d.page(state.page);
                     d.text("I had an uneventful sleep.");
                     d.text("How refreshing.");
-                    outcome.dialogue(state, d);
+                    if state.food.is_max() && !state.health.is_max() {
+                        d.color_text("Regained some health", DARKGREEN);
+                    }
                 })
                 .await;
-                outcome
+                state.health.add(1);
             }
             Event::Mice => {
                 Dialogue::show(|d| {
@@ -66,10 +98,16 @@ impl Event {
                     }
                 })
                 .await;
-                if state.cat.get().is_some() {
-                    Outcome::Nothing
-                } else {
-                    Outcome::LosePotatoes
+                if state.cat.get().is_none() {
+                    if let Some(farm) = state.farm.as_mut() {
+                        farm.for_each(|_, _, tile| {
+                            if let Tile::Potato { .. } = tile {
+                                if state.rng.gen_bool(0.5) {
+                                    *tile = Tile::Dirt;
+                                }
+                            }
+                        });
+                    }
                 }
             }
             Event::Headache => {
@@ -81,7 +119,6 @@ impl Event {
                     d.text("The worst part about a nuclear war is the lack of painkillers.");
                 })
                 .await;
-                Outcome::SkipDay
             }
             Event::CatVisit => {
                 let result = Prompt::show(|p| {
@@ -98,15 +135,27 @@ impl Event {
                 })
                 .await;
 
-                Outcome::GainCat(result.index == 1)
+                if result == 1 {
+                    state.cat = CatState::Cat(Cat::default());
+                } else {
+                    state.cat = CatState::None;
+                }
             }
             Event::Raiders => {
+                let has_gun = state.inventory.count(Item::Gun) > 0;
                 let potato_count = state.inventory.count(Item::CookedPotato);
                 let requested = if state.cat.get().is_some() { 100 } else { 70 };
                 let damage = 30;
                 let result = Prompt::show(|p| {
                     p.page(state.page);
                     p.text("Raiders came in last night demanding food.");
+                    if has_gun {
+                        p.text("Luckily I had that gun.");
+                        p.text("I pointed it at them and they got scared.");
+                        p.text("You should've seen their faces.");
+                        p.skippable();
+                        return;
+                    }
                     if state.cat.get().is_some() {
                         p.text("They even threatened to kill my cat if I didn't comply.");
                     }
@@ -130,116 +179,35 @@ impl Event {
                     }
                 })
                 .await;
-                match result.index {
-                    1 => Outcome::LoseHealth(damage),
-                    2 => Outcome::LoseItem(Item::CookedPotato, requested),
+                match result {
+                    0 if has_gun => {}
+                    1 => {
+                        if !state.health.subn(damage) {
+                            state.is_dead = true;
+                        }
+                    }
+                    2 => {
+                        state.inventory.remove(Item::CookedPotato, requested);
+                    }
                     _ => unreachable!(),
                 }
             }
             Event::UnlockFarm => {
-                let outcome = Outcome::UnlockFarm;
                 Dialogue::show(|d| {
                     d.page(state.page);
                     d.text("I'm so tired of sitting inside all day.");
                     d.text("And my food is starting to get low.");
                     d.text("");
                     d.text("I should go farm some potatoes.");
-                    outcome.dialogue(state, d);
+                    d.jiggle_color_text("Unlocked farm!", YELLOW);
                 })
                 .await;
-                outcome
+                state.farm = Some(Farm::default());
             }
-        };
-
-        outcome.apply(state);
+        }
     }
 
     pub fn can_execute_action(&self) -> bool {
         !matches!(self, Event::Headache)
-    }
-}
-
-#[allow(dead_code)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Outcome {
-    RenerateHealth(u32),
-    GainItem(Item, usize),
-    LoseItem(Item, usize),
-    LoseHealth(u32),
-    GainCat(bool),
-    LosePotatoes,
-    UnlockFarm,
-    SkipDay,
-    Nothing,
-}
-
-impl Outcome {
-    pub fn dialogue(&self, state: &State, d: &mut Dialogue) {
-        match self {
-            Outcome::RenerateHealth(health) => {
-                if state.health.can_add(*health).is_some() {
-                    d.color_text("Regained some health", DARKGREEN);
-                }
-            }
-            Outcome::GainItem(item, n) => {
-                d.color_text(
-                    if *n == 1 {
-                        format!("Got a {}", item.name_one())
-                    } else {
-                        format!("Got {} {}", n, item.name_multiple())
-                    },
-                    YELLOW,
-                );
-            }
-            Outcome::LoseItem(item, n) => {
-                d.color_text(
-                    if *n == 1 {
-                        format!("Lost a {}", item.name_one())
-                    } else {
-                        format!("Lost {} {}", n, item.name_multiple())
-                    },
-                    RED,
-                );
-            }
-            Outcome::LoseHealth(_) => {
-                d.color_text("<You lost health>", RED);
-            }
-            Outcome::UnlockFarm => {
-                d.jiggle_color_text("Unlocked farm!", YELLOW);
-            }
-            Outcome::GainCat(_) => {}
-            Outcome::LosePotatoes => {}
-            Outcome::SkipDay => {}
-            Outcome::Nothing => {}
-        }
-    }
-
-    pub fn apply(self, state: &mut State) {
-        match self {
-            Outcome::RenerateHealth(health) => state.health.add(health),
-            Outcome::GainItem(item, count) => state.inventory.add(item, count),
-            Outcome::LoseItem(item, count) => state.inventory.remove(item, count),
-            Outcome::UnlockFarm => state.farm = Some(Farm::default()),
-            Outcome::LoseHealth(health) => {
-                if !state.health.subn(health) {
-                    state.is_dead = true;
-                }
-            }
-            Outcome::LosePotatoes => {
-                if let Some(farm) = state.farm.as_mut() {
-                    farm.for_each(|_, _, tile| {
-                        if let Tile::Potato { .. } = tile {
-                            if state.rng.gen_bool(0.5) {
-                                *tile = Tile::Dirt;
-                            }
-                        }
-                    });
-                }
-            }
-            Outcome::SkipDay => {}
-            Outcome::Nothing => {}
-            Outcome::GainCat(true) => state.cat = CatState::Cat(Cat::default()),
-            Outcome::GainCat(false) => state.cat = CatState::None,
-        }
     }
 }

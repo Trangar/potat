@@ -7,6 +7,7 @@ pub enum Item {
     RawPotatoBlight,
     CookedPotato,
     CanOfBeans,
+    Gun,
 }
 
 impl Item {
@@ -16,22 +17,7 @@ impl Item {
             Self::RawPotato | Self::RawPotatoBlight => "Raw potato",
             Self::CookedPotato => "Cooked potato",
             Self::CanOfBeans => "Can of beans",
-        }
-    }
-    pub fn name_one(&self) -> &str {
-        match self {
-            Self::Seeds => "potato seed",
-            Self::RawPotato | Self::RawPotatoBlight => "raw potato",
-            Self::CookedPotato => "cooked potato",
-            Self::CanOfBeans => "can of beans",
-        }
-    }
-    pub fn name_multiple(&self) -> &str {
-        match self {
-            Self::Seeds => "potato seeds",
-            Self::RawPotato | Self::RawPotatoBlight => "raw potatos",
-            Self::CookedPotato => "cooked potatos",
-            Self::CanOfBeans => "cans of beans",
+            Self::Gun => "A gun",
         }
     }
 

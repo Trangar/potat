@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use macroquad::prelude::{is_key_pressed, KeyCode};
 
 use super::{line::Line, Dialogue, DialogueBuilder, DialogueOpts, FrameCtx};
@@ -6,6 +8,7 @@ use super::{line::Line, Dialogue, DialogueBuilder, DialogueOpts, FrameCtx};
 pub struct Prompt {
     lines: Vec<Line>,
     options: Vec<PromptLine>,
+    skippable: bool,
 }
 
 impl Prompt {
@@ -27,14 +30,19 @@ impl Prompt {
         });
         self.options.last_mut().unwrap()
     }
-    pub async fn show<FN>(builder: FN) -> PromptLine
+
+    pub fn skippable(&mut self) {
+        self.skippable = true;
+    }
+
+    pub async fn show<FN>(builder: FN) -> usize
     where
         FN: FnOnce(&mut Prompt),
     {
         Self::new(builder).render().await
     }
-    pub async fn render(mut self) -> PromptLine {
-        let mut result: Option<PromptLine> = None;
+    pub async fn render(mut self) -> usize {
+        let mut result: Option<NonZeroUsize> = None;
         Dialogue::new(|d| {
             for line in self.lines {
                 d.lines.push(line);
@@ -44,7 +52,7 @@ impl Prompt {
             }
         })
         .render_with_opts(&mut DialogueOpts {
-            enable_enter_continue: false,
+            enable_enter_continue: self.skippable,
             events: Some(|ctx: FrameCtx| {
                 if result.is_none() && ctx.all_text_visible {
                     if let Some(num_pressed) = get_num_pressed() {
@@ -54,7 +62,7 @@ impl Prompt {
                             for line in option.lines.iter().cloned() {
                                 ctx.dialogue.lines.push(line);
                             }
-                            result = Some(option);
+                            result = NonZeroUsize::new(option.index);
                             *ctx.enable_enter_continue = true;
                         }
                     }
@@ -71,7 +79,7 @@ impl Prompt {
             ..Default::default()
         })
         .await;
-        result.unwrap()
+        result.map(|r| r.get()).unwrap_or_default()
     }
 }
 

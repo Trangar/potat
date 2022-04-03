@@ -1,12 +1,9 @@
-use super::{Event, Item, Outcome, State, Visitor};
+use super::{Event, Item, State, Visitor};
 use rand::{thread_rng, Rng};
 
 static EVENTS: &[E] = &[
     E {
-        event: Event::Visitor {
-            who: Visitor::OldFriend,
-            outcome: Outcome::GainItem(Item::Seeds, 10),
-        },
+        event: Event::Visitor(Visitor::OldFriend),
         condition: |state| state.day_delta() == 0,
         chance: 1.0,
     },
@@ -18,6 +15,11 @@ static EVENTS: &[E] = &[
     E {
         event: Event::CatVisit,
         condition: |s| s.farm.is_some() && !s.cat.has_visited(),
+        chance: 0.1,
+    },
+    E {
+        event: Event::Visitor(Visitor::Trader),
+        condition: |state| state.day_delta() > 5,
         chance: 0.1,
     },
     E {

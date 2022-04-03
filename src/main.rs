@@ -27,6 +27,7 @@ async fn main() {
             if is_key_pressed(KeyCode::F1) {
                 let mut state = State::new(1);
                 state.inventory.add(Item::Seeds, 10);
+                state.inventory.add(Item::CookedPotato, 10000);
                 state.farm = Some(Farm::default());
                 state.page = 8;
                 break (state, None);

@@ -101,7 +101,7 @@ impl State {
                 y += 40.;
 
                 for (item, count) in self.inventory.items() {
-                    if count == 0 {
+                    if count == 1 {
                         draw_text(item.name(), x, y, 24., WHITE);
                     } else {
                         draw_text(&format!("{}: {}", item.name(), count), x, y, 24., WHITE);
@@ -207,14 +207,6 @@ impl Stat {
         } else {
             self.current = 0;
             false
-        }
-    }
-
-    fn can_add(&self, count: u32) -> Option<u32> {
-        if self.current == self.max {
-            None
-        } else {
-            Some((self.max - self.current).min(count))
         }
     }
 
