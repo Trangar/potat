@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use macroquad::prelude::{is_key_pressed, KeyCode};
+use macroquad::prelude::{is_key_pressed, KeyCode, YELLOW};
 
 use super::{line::Line, Dialogue, DialogueBuilder, DialogueOpts, FrameCtx};
 
@@ -21,14 +21,29 @@ impl Prompt {
         prompt
     }
 
-    pub fn add_option(&mut self, text: impl Into<String>) -> &mut PromptLine {
-        let index = self.options.len() + 1;
+    pub fn add_numbered_option(
+        &mut self,
+        index: usize,
+        text: impl Into<String>,
+    ) -> &mut PromptLine {
         self.options.push(PromptLine {
             index,
             text: text.into(),
             lines: Vec::new(),
         });
         self.options.last_mut().unwrap()
+    }
+
+    pub fn add_option(&mut self, text: impl Into<String>) -> &mut PromptLine {
+        self.add_numbered_option(
+            self.options
+                .iter()
+                .map(|o| o.index)
+                .max()
+                .unwrap_or_default()
+                + 1,
+            text,
+        )
     }
 
     pub fn skippable(&mut self) {
@@ -58,6 +73,16 @@ impl Prompt {
                     if let Some(num_pressed) = get_num_pressed() {
                         if let Some(idx) = self.options.iter().position(|o| o.index == num_pressed)
                         {
+                            let offset = ctx.dialogue.lines.len() - self.options.len() + idx;
+                            let text = match ctx.dialogue.lines[offset].clone() {
+                                Line::Text { text, .. } => text,
+                                _ => unimplemented!(),
+                            };
+                            ctx.dialogue.lines[offset] = Line::Text {
+                                text,
+                                color: YELLOW,
+                            };
+
                             let option = self.options.remove(idx);
                             for line in option.lines.iter().cloned() {
                                 ctx.dialogue.lines.push(line);
@@ -69,7 +94,9 @@ impl Prompt {
                 }
                 if !ctx.all_text_visible && is_key_pressed(KeyCode::Space) {
                     crate::dialogue::Event::ShowText
-                } else if ctx.all_text_visible && result.is_some() && is_key_pressed(KeyCode::Enter)
+                } else if ctx.all_text_visible
+                    && (*ctx.enable_enter_continue || result.is_some())
+                    && is_key_pressed(KeyCode::Enter)
                 {
                     crate::dialogue::Event::Done
                 } else {

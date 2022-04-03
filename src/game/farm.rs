@@ -10,6 +10,7 @@ const SIZE: usize = 10;
 const POTATO_MATURE_AGE: u8 = 5;
 const TILE_PX: f32 = 50.;
 const PLAYER_SPEED: f32 = 2.;
+const PLAYER_SICK_SPEED: f32 = 0.5;
 const TOUCH_DISTANCE: f32 = 30.;
 const TOUCH_RANGE: f32 = 60.;
 const FARM_START: (usize, usize) = (4, 1);
@@ -107,6 +108,11 @@ impl Farm {
         let mut facing = (0, 1);
         let start_raw_potatoes =
             state.inventory.count(Item::RawPotato) + state.inventory.count(Item::RawPotatoBlight);
+        let speed = if state.has_a_cold {
+            PLAYER_SICK_SPEED
+        } else {
+            PLAYER_SPEED
+        };
         loop {
             clear_background(DARKGREEN);
             for x in 0..SIZE {
@@ -144,8 +150,8 @@ impl Farm {
 
             if dx != 0 || dy != 0 {
                 facing = (dx, dy);
-                px += (dx as f32) * PLAYER_SPEED;
-                py += (dy as f32) * PLAYER_SPEED;
+                px += (dx as f32) * speed;
+                py += (dy as f32) * speed;
 
                 let min_x = if py < 170. { 10. } else { 0. } + 16.;
                 let min_y = if px < 70. { 10. } else { 0. } + 32.;
@@ -157,6 +163,9 @@ impl Farm {
             let raw_potato_count = state.inventory.count(Item::RawPotato)
                 + state.inventory.count(Item::RawPotatoBlight);
 
+            if state.has_a_cold {
+                draw_text("Sick", 10., screen_height() - 100., 40., SKYBLUE);
+            }
             draw_text(
                 &format!("Seeds: {}", seed_count),
                 10.,

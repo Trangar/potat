@@ -10,6 +10,7 @@ pub enum Event {
     Headache,
     Raiders,
     CatVisit,
+    Cold,
     Mice,
     Nothing,
 }
@@ -23,6 +24,34 @@ pub enum Visitor {
 impl Event {
     pub async fn dialogue(&self, state: &mut State) {
         match self {
+            Event::Cold => {
+                if state.has_a_cold {
+                    if state.rng.gen_bool(0.5) {
+                        Dialogue::show(|d| {
+                            d.page(state.page);
+                            d.text("My sinuses are all cleared up this morning!");
+                        })
+                        .await;
+                        state.has_a_cold = false;
+                    } else {
+                        Dialogue::show(|d| {
+                            d.page(state.page);
+                            d.text("I still can't breathe.");
+                            d.text("I hope this cold is over soon.");
+                        })
+                        .await;
+                    }
+                } else {
+                    Dialogue::show(|d| {
+                        d.page(state.page);
+                        d.text("Woke up this morning and my sinuses are all clogged up.");
+                        d.text("Must've caught a cold last night.");
+                        d.text("I don't know if I can work today...");
+                    })
+                    .await;
+                    state.has_a_cold = true;
+                }
+            }
             Event::Visitor(Visitor::OldFriend) => {
                 Dialogue::show(|d| {
                     d.page(state.page);
@@ -45,7 +74,10 @@ impl Event {
                     if potatoes < 10 {
                         d.text("But I didn't have enough...");
                         d.skippable();
+                        return;
                     }
+                    d.add_numbered_option(0, "don't trade")
+                        .text("But I didn't feel like trading.");
                     if potatoes > 10 {
                         d.add_option("10 potato seeds for 10 cooked potatoes")
                             .text("I traded some potatoes for some seeds.")

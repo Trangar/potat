@@ -29,6 +29,7 @@ async fn main() {
                 state.inventory.add(Item::Seeds, 10);
                 state.inventory.add(Item::CookedPotato, 10000);
                 state.farm = Some(Farm::default());
+                state.has_a_cold = true;
                 state.page = 8;
                 break (state, None);
             }

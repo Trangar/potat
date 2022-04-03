@@ -26,6 +26,7 @@ pub struct State {
     pub is_dead: bool,
     pub food: Stat,
     pub cat: CatState,
+    pub has_a_cold: bool,
     pub last_cook_had_blight: bool,
     pub farm: Option<Farm>,
 }
@@ -41,6 +42,7 @@ impl State {
             health: Stat::new(50),
             food: Stat::new(100),
             cat: CatState::NotVisited,
+            has_a_cold: false,
             last_cook_had_blight: false,
             farm: None,
         }

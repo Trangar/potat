@@ -12,6 +12,17 @@ static EVENTS: &[E] = &[
         condition: |state| state.day_delta() == 2,
         chance: 1.0,
     },
+    // cold event will always trigger when we have a cold
+    E {
+        event: Event::Cold,
+        condition: |state| state.has_a_cold,
+        chance: 1.0,
+    },
+    E {
+        event: Event::Cold,
+        condition: |state| state.farm.is_some(),
+        chance: 0.1,
+    },
     E {
         event: Event::CatVisit,
         condition: |s| s.farm.is_some() && !s.cat.has_visited(),
@@ -34,7 +45,7 @@ static EVENTS: &[E] = &[
     },
     E {
         event: Event::Headache,
-        condition: |_| true,
+        condition: |state| state.farm.is_some(),
         chance: 0.05,
     },
 ];
@@ -47,9 +58,12 @@ pub struct E {
 
 pub fn next_event(state: &State) -> Event {
     let mut rng = thread_rng();
-    for event in EVENTS {
-        if (event.condition)(state) && rng.gen_bool(event.chance) {
-            return event.event;
+    // try rolling 3 times
+    for _ in 0..3 {
+        for event in EVENTS {
+            if (event.condition)(state) && rng.gen_bool(event.chance) {
+                return event.event;
+            }
         }
     }
 
