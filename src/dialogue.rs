@@ -52,14 +52,19 @@ impl Dialogue {
         self.big_text(format!("Page {}", page));
     }
 
-    pub async fn render_with_opts<FN>(self, opts: &mut DialogueOpts<FN>)
+    pub async fn render_with_opts<FN>(mut self, opts: &mut DialogueOpts<FN>)
     where
         FN: FnMut(FrameCtx) -> Event,
     {
+        let mut enable_enter_continue = opts.enable_enter_continue;
         let mut line_idx = 1;
         let mut char_idx = 0;
-
         let mut pause_time = 0;
+
+        let event_cb = opts
+            .events
+            .as_mut()
+            .expect("DialogueOpts doesn't have an event callback");
         let start = Instant::now();
 
         loop {
@@ -84,7 +89,7 @@ impl Dialogue {
                     WHITE,
                 );
             } else {
-                if opts.enable_enter_continue {
+                if enable_enter_continue {
                     draw_text_centered(
                         "<ENTER> continue",
                         screen_width() / 2.0,
@@ -104,8 +109,10 @@ impl Dialogue {
                 }
             }
 
-            let event = (opts.events.as_mut().unwrap())(FrameCtx {
+            let event = event_cb(FrameCtx {
                 all_text_visible: self.lines.len() <= line_idx,
+                dialogue: &mut self,
+                enable_enter_continue: &mut enable_enter_continue,
             });
             match event {
                 Event::Done => return,
@@ -159,10 +166,8 @@ impl Dialogue {
     }
 }
 
-pub struct DialogueOpts<FN>
-where
-    FN: FnMut(FrameCtx) -> Event,
-{
+#[derive(Clone)]
+pub struct DialogueOpts<FN> {
     pub enable_enter_continue: bool,
     pub intro: bool,
     pub events: Option<FN>,
@@ -183,8 +188,10 @@ where
     }
 }
 
-pub struct FrameCtx {
+pub struct FrameCtx<'a> {
     pub all_text_visible: bool,
+    pub dialogue: &'a mut Dialogue,
+    pub enable_enter_continue: &'a mut bool,
 }
 
 #[derive(PartialEq, Eq, Debug)]

@@ -15,8 +15,30 @@ pub struct State {
     pub page: u32,
     pub health: Stat,
     pub food: Stat,
+    pub cat: CatState,
     pub farm: Option<Farm>,
 }
+
+pub enum CatState {
+    NotVisited,
+    None,
+    Cat(Cat),
+}
+
+impl CatState {
+    pub fn has_visited(&self) -> bool {
+        matches!(self, CatState::None | CatState::Cat(_))
+    }
+    pub fn get(&self) -> Option<&Cat> {
+        match self {
+            Self::Cat(cat) => Some(cat),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct Cat {}
 
 impl State {
     pub fn new(start_page: u32) -> Self {
@@ -27,6 +49,7 @@ impl State {
             inventory: Inventory::default(),
             health: Stat::new(50),
             food: Stat::new(100),
+            cat: CatState::NotVisited,
             farm: None,
         }
     }
@@ -74,6 +97,11 @@ impl State {
                     ExpectedChange::Decreasing
                 },
             );
+
+            if let Some(_cat) = self.cat.get() {
+                draw_text("Cat is happy", x, y, 24., WHITE);
+                y += 30.;
+            }
 
             if !self.inventory.items.is_empty() {
                 draw_text("Inventory", x, y, 30., WHITE);
