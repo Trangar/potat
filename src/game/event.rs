@@ -1,9 +1,6 @@
-use super::{Cat, CatState, State};
-use crate::{
-    dialogue::{Dialogue, DialogueOpts, FrameCtx},
-    farm::Farm,
-};
-use macroquad::prelude::{is_key_pressed, KeyCode, RED, YELLOW};
+use super::{Cat, CatState, Farm, Item, State};
+use crate::dialogue::{Dialogue, DialogueBuilder, Prompt};
+use macroquad::prelude::{RED, YELLOW};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Event {
@@ -12,25 +9,6 @@ pub enum Event {
     Headache,
     CatVisit,
     Nothing,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Item {
-    Seeds,
-    RawPotato,
-    CookedPotato,
-    CanOfBeans,
-}
-
-impl Item {
-    pub fn name(&self) -> &str {
-        match self {
-            Self::Seeds => "Potato seeds",
-            Self::RawPotato => "Raw potato",
-            Self::CookedPotato => "Cooked potato",
-            Self::CanOfBeans => "Can of beans",
-        }
-    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -81,47 +59,21 @@ impl Event {
                 Outcome::SkipDay
             }
             Event::CatVisit => {
-                let mut take_cat: Option<bool> = None;
-                Dialogue::new(|d| {
-                    d.page(state.page);
-                    d.text("I had a visit of a cute cat this morning.");
-                    d.text("He seemed to like me.");
-                    d.text("<1> take the cat in.");
-                    d.text("<2> leave the cat out.");
-                })
-                .render_with_opts(&mut DialogueOpts {
-                    enable_enter_continue: false,
-                    events: Some(|ctx: FrameCtx| {
-                        if take_cat.is_none() && ctx.all_text_visible {
-                            if is_key_pressed(KeyCode::Key1) {
-                                take_cat = Some(true);
-                                ctx.dialogue.text("I decided to take the cat in.");
-                                ctx.dialogue.text("He seems to like the fireplace.");
-                                *ctx.enable_enter_continue = true;
-                            }
-                            if is_key_pressed(KeyCode::Key2) {
-                                take_cat = Some(false);
-                                ctx.dialogue
-                                    .text("Momma always said that cats brought bad omens.");
-                                ctx.dialogue.text("I chased him off good.");
-                                *ctx.enable_enter_continue = true;
-                            }
-                        }
-                        if !ctx.all_text_visible && is_key_pressed(KeyCode::Space) {
-                            crate::dialogue::Event::ShowText
-                        } else if ctx.all_text_visible
-                            && take_cat.is_some()
-                            && is_key_pressed(KeyCode::Enter)
-                        {
-                            crate::dialogue::Event::Done
-                        } else {
-                            crate::dialogue::Event::NextChar
-                        }
-                    }),
-                    ..Default::default()
+                let result = Prompt::show(|p| {
+                    p.page(state.page);
+                    p.text("I had a visit of a cute cat this morning.");
+                    p.text("He seemed to like me.");
+
+                    p.add_option("take the cat in.")
+                        .text("I decided to take the cat in.")
+                        .text("He seems to like the fireplace.");
+                    p.add_option("chase the cat off.")
+                        .text("Momma always said that cats brought bad omens.")
+                        .text("I don't think that cat is going to be back.");
                 })
                 .await;
-                Outcome::GainCat(take_cat.unwrap())
+
+                Outcome::GainCat(result.index == 1)
             }
             Event::UnlockFarm => {
                 let outcome = Outcome::UnlockFarm;
@@ -146,14 +98,15 @@ impl Event {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Outcome {
     RenerateHealth(u32),
-    GainItem(Item),
+    GainItem(Item, usize),
+    LoseItem(Item, usize),
     GainCat(bool),
     UnlockFarm,
     SkipDay,
-    #[allow(dead_code)]
     Nothing,
 }
 
@@ -165,12 +118,30 @@ impl Outcome {
                     d.color_text(format!("Regained {} health", count), RED);
                 }
             }
-            Outcome::GainItem(Item::Seeds) => d.color_text("Got potato seeds!", YELLOW),
-            Outcome::GainItem(Item::RawPotato) => d.color_text("Got a raw potato!", YELLOW),
-            Outcome::GainItem(Item::CookedPotato) => d.color_text("Got a cooked potato!", YELLOW),
-            Outcome::GainItem(Item::CanOfBeans) => d.color_text("Got a can of beans!", YELLOW),
+            Outcome::GainItem(item, n) => {
+                d.color_text(
+                    if *n == 1 {
+                        format!("Got a {}", item.name_one())
+                    } else {
+                        format!("Got {} {}", n, item.name_multiple())
+                    },
+                    YELLOW,
+                );
+            }
+            Outcome::LoseItem(item, n) => {
+                d.color_text(
+                    if *n == 1 {
+                        format!("Lost a {}", item.name_one())
+                    } else {
+                        format!("Lost {} {}", n, item.name_multiple())
+                    },
+                    RED,
+                );
+            }
             Outcome::GainCat(_) => {}
-            Outcome::UnlockFarm => d.jiggle_color_text("Unlocked farm!", YELLOW),
+            Outcome::UnlockFarm => {
+                d.jiggle_color_text("Unlocked farm!", YELLOW);
+            }
             Outcome::SkipDay => {}
             Outcome::Nothing => {}
         }
@@ -179,7 +150,8 @@ impl Outcome {
     pub fn apply(self, state: &mut State) {
         match self {
             Outcome::RenerateHealth(health) => state.health.add(health),
-            Outcome::GainItem(item) => state.inventory.add(item),
+            Outcome::GainItem(item, count) => state.inventory.add(item, count),
+            Outcome::LoseItem(item, count) => state.inventory.remove(item, count),
             Outcome::UnlockFarm => state.farm = Some(Farm::default()),
             Outcome::SkipDay => {}
             Outcome::Nothing => {}

@@ -202,16 +202,17 @@ impl Farm {
     fn execute(&mut self, x: usize, y: usize, state: &mut State) {
         match &self.tiles[x][y] {
             Tile::Potato { age: 3 } => {
-                state.inventory.add(Item::RawPotato);
-                state.inventory.add(Item::Seeds);
-                if state.rng.gen_bool(0.5) {
-                    state.inventory.add(Item::Seeds);
-                }
+                let potato_count = if state.rng.gen_bool(0.5) { 3 } else { 2 };
+                let seed_count = if state.rng.gen_bool(0.5) { 2 } else { 1 };
+                state.inventory.add(Item::RawPotato, potato_count);
+                state.inventory.add(Item::Seeds, seed_count);
+
                 self.tiles[x][y] = Tile::Dirt;
             }
             Tile::Dirt if state.inventory.count(Item::Seeds) > 0 => {
-                state.inventory.remove(Item::Seeds);
-                self.tiles[x][y] = Tile::Potato { age: 0 };
+                if state.inventory.try_remove(Item::Seeds, 1) {
+                    self.tiles[x][y] = Tile::Potato { age: 0 };
+                }
             }
             tile => {
                 eprintln!("Tile {:?} ({}/{}) is not actionable", tile, x, y)

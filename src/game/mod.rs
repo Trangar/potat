@@ -1,10 +1,19 @@
+mod cat;
 mod event;
 mod events;
+mod farm;
+mod inventory;
 
+pub use cat::*;
 pub use event::*;
 pub use events::*;
+pub use farm::*;
+pub use inventory::*;
 
-use crate::{assets::Assets, dialogue::Dialogue, farm::Farm};
+use crate::{
+    assets::Assets,
+    dialogue::{Dialogue, DialogueBuilder},
+};
 use ::rand::{thread_rng, Rng, RngCore};
 use macroquad::prelude::*;
 
@@ -18,27 +27,6 @@ pub struct State {
     pub cat: CatState,
     pub farm: Option<Farm>,
 }
-
-pub enum CatState {
-    NotVisited,
-    None,
-    Cat(Cat),
-}
-
-impl CatState {
-    pub fn has_visited(&self) -> bool {
-        matches!(self, CatState::None | CatState::Cat(_))
-    }
-    pub fn get(&self) -> Option<&Cat> {
-        match self {
-            Self::Cat(cat) => Some(cat),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct Cat {}
 
 impl State {
     pub fn new(start_page: u32) -> Self {
@@ -103,10 +91,10 @@ impl State {
                 y += 30.;
             }
 
-            if !self.inventory.items.is_empty() {
+            if self.inventory.has_items() {
                 draw_text("Inventory", x, y, 30., WHITE);
                 y += 40.;
-                for (item, count) in &self.inventory.items {
+                for (item, count) in self.inventory.items() {
                     if *count == 0 {
                         draw_text(item.name(), x, y, 24., WHITE);
                     } else {
@@ -130,8 +118,12 @@ impl State {
                         d.text("");
                         match potatoes {
                             0 => {}
-                            1 => d.text("I only had a single potato..."),
-                            n => d.text(format!("I counted a total of {} potatoes", n)),
+                            1 => {
+                                d.text("I only had a single potato...");
+                            }
+                            n => {
+                                d.text(format!("I counted a total of {} potatoes", n));
+                            }
                         }
                         d.text("");
                         d.text("The house smelled amazing.");
@@ -165,89 +157,6 @@ impl State {
 pub enum DayAction {
     Farm,
     Next,
-}
-
-pub struct Inventory {
-    items: Vec<(Item, usize)>,
-}
-
-impl Default for Inventory {
-    fn default() -> Self {
-        Self {
-            items: vec![(Item::CanOfBeans, 5)],
-        }
-    }
-}
-
-impl Inventory {
-    pub fn add(&mut self, item: Item) {
-        for (i, count) in self.items.iter_mut() {
-            if i == &item {
-                *count += 1;
-                return;
-            }
-        }
-        self.items.push((item, 1));
-    }
-
-    pub fn count(&self, item: Item) -> usize {
-        self.items
-            .iter()
-            .filter_map(|(i, count)| if i == &item { Some(*count) } else { None })
-            .next()
-            .unwrap_or_default()
-    }
-
-    pub fn cook_all(&mut self) {
-        if let Some(raw_potato_index) = self.items.iter().position(|(i, _)| i == &Item::RawPotato) {
-            let potatoes = self.items[raw_potato_index].1;
-            self.items.remove(raw_potato_index);
-            if let Some(cooked_potato_index) = self
-                .items
-                .iter()
-                .position(|(i, _)| i == &Item::CookedPotato)
-            {
-                self.items[cooked_potato_index].1 += potatoes;
-            } else {
-                self.items.push((Item::CookedPotato, potatoes));
-            }
-        }
-    }
-
-    pub fn has_edibles(&self) -> bool {
-        self.items
-            .iter()
-            .any(|(i, _)| matches!(i, Item::CookedPotato))
-    }
-
-    pub fn has_cookables(&self) -> bool {
-        self.items.iter().any(|(i, _)| matches!(i, Item::RawPotato))
-    }
-
-    pub fn remove(&mut self, item: Item) -> bool {
-        if let Some(idx) = self.items.iter().position(|(i, _)| i == &item) {
-            self.items[idx].1 -= 1;
-            if self.items[idx].1 == 0 {
-                self.items.remove(idx);
-            }
-            true
-        } else {
-            false
-        }
-    }
-
-    fn remove_edible(&mut self) -> bool {
-        for idx in 0..self.items.len() {
-            if matches!(self.items[idx].0, Item::CookedPotato | Item::CanOfBeans) {
-                self.items[idx].1 -= 1;
-                if self.items[idx].1 == 0 {
-                    self.items.remove(idx);
-                }
-                return true;
-            }
-        }
-        false
-    }
 }
 
 pub struct Stat {

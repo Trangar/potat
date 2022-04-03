@@ -5,7 +5,7 @@ static EVENTS: &[E] = &[
     E {
         event: Event::Visitor {
             who: Visitor::OldFriend,
-            outcome: Outcome::GainItem(Item::Seeds),
+            outcome: Outcome::GainItem(Item::Seeds, 10),
         },
         condition: |state| state.day_delta() == 0,
         chance: 1.0,

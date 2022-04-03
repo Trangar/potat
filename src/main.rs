@@ -1,10 +1,9 @@
 mod assets;
 mod dialogue;
-mod farm;
 mod game;
 
 use assets::Assets;
-use dialogue::{Dialogue, DialogueOpts, Event, FrameCtx};
+use dialogue::{Dialogue, DialogueBuilder, DialogueOpts, Event, FrameCtx};
 use game::{DayAction, Item, State};
 use macroquad::prelude::*;
 
@@ -23,7 +22,7 @@ async fn main() {
         }
         if is_key_pressed(KeyCode::F1) {
             let mut state = State::new(5);
-            state.inventory.add(Item::Seeds);
+            state.inventory.add(Item::Seeds, 10);
             state.page = 7;
             break state;
         }

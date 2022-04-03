@@ -1,5 +1,6 @@
 use macroquad::prelude::*;
 
+#[derive(Clone)]
 pub enum Line {
     BigText { text: String, color: Color },
     Text { text: String, color: Color },

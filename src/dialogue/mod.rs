@@ -1,4 +1,7 @@
 mod line;
+mod prompt;
+
+pub use prompt::Prompt;
 
 use line::Line;
 use macroquad::prelude::*;
@@ -6,6 +9,48 @@ use std::time::Instant;
 
 use crate::draw_text_centered;
 
+pub trait DialogueBuilder {
+    fn lines_mut(&mut self) -> &mut Vec<Line>;
+
+    fn jiggle_color_text(&mut self, text: impl Into<String>, color: Color) -> &mut Self {
+        self.lines_mut().push(Line::Jiggle {
+            text: text.into(),
+            color,
+        });
+        self
+    }
+    fn big_color_text(&mut self, text: impl Into<String>, color: Color) -> &mut Self {
+        self.lines_mut().push(Line::BigText {
+            text: text.into(),
+            color,
+        });
+        self
+    }
+    fn color_text(&mut self, text: impl Into<String>, color: Color) -> &mut Self {
+        self.lines_mut().push(Line::Text {
+            text: text.into(),
+            color,
+        });
+        self
+    }
+    fn jiggle_text(&mut self, text: impl Into<String>) -> &mut Self {
+        self.jiggle_color_text(text, WHITE);
+        self
+    }
+    fn big_text(&mut self, text: impl Into<String>) -> &mut Self {
+        self.big_color_text(text, WHITE);
+        self
+    }
+    fn text(&mut self, text: impl Into<String>) -> &mut Self {
+        self.color_text(text, WHITE);
+        self
+    }
+
+    fn page(&mut self, page: u32) -> &mut Self {
+        self.big_text(format!("Page {}", page));
+        self
+    }
+}
 pub struct Dialogue {
     lines: Vec<Line>,
 }
@@ -18,38 +63,6 @@ impl Dialogue {
     }
     pub async fn show(constructor: impl FnOnce(&mut Dialogue)) {
         Self::new(constructor).render().await;
-    }
-
-    pub fn jiggle_color_text(&mut self, text: impl Into<String>, color: Color) {
-        self.lines.push(Line::Jiggle {
-            text: text.into(),
-            color,
-        });
-    }
-    pub fn big_color_text(&mut self, text: impl Into<String>, color: Color) {
-        self.lines.push(Line::BigText {
-            text: text.into(),
-            color,
-        });
-    }
-    pub fn color_text(&mut self, text: impl Into<String>, color: Color) {
-        self.lines.push(Line::Text {
-            text: text.into(),
-            color,
-        });
-    }
-    pub fn jiggle_text(&mut self, text: impl Into<String>) {
-        self.jiggle_color_text(text, WHITE);
-    }
-    pub fn big_text(&mut self, text: impl Into<String>) {
-        self.big_color_text(text, WHITE);
-    }
-    pub fn text(&mut self, text: impl Into<String>) {
-        self.color_text(text, WHITE);
-    }
-
-    pub fn page(&mut self, page: u32) {
-        self.big_text(format!("Page {}", page));
     }
 
     pub async fn render_with_opts<FN>(mut self, opts: &mut DialogueOpts<FN>)
@@ -163,6 +176,12 @@ impl Dialogue {
             }
         })
         .await;
+    }
+}
+
+impl DialogueBuilder for Dialogue {
+    fn lines_mut(&mut self) -> &mut Vec<Line> {
+        &mut self.lines
     }
 }
 
