@@ -21,6 +21,11 @@ static EVENTS: &[E] = &[
         chance: 0.1,
     },
     E {
+        event: Event::Raiders,
+        condition: |s| s.inventory.count(Item::CookedPotato) > 50,
+        chance: 0.1,
+    },
+    E {
         event: Event::Headache,
         condition: |_| true,
         chance: 0.05,

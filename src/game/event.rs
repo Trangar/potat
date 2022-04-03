@@ -1,12 +1,13 @@
 use super::{Cat, CatState, Farm, Item, State};
 use crate::dialogue::{Dialogue, DialogueBuilder, Prompt};
-use macroquad::prelude::{RED, YELLOW};
+use macroquad::prelude::{DARKGREEN, RED, YELLOW};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Event {
     Visitor { who: Visitor, outcome: Outcome },
     UnlockFarm,
     Headache,
+    Raiders,
     CatVisit,
     Nothing,
 }
@@ -37,7 +38,11 @@ impl Event {
                 *outcome
             }
             Event::Nothing => {
-                let outcome = Outcome::RenerateHealth(10);
+                let outcome = if state.food.is_max() {
+                    Outcome::RenerateHealth(1)
+                } else {
+                    Outcome::Nothing
+                };
                 Dialogue::show(|d| {
                     d.page(state.page);
                     d.text("I had an uneventful sleep.");
@@ -75,6 +80,42 @@ impl Event {
 
                 Outcome::GainCat(result.index == 1)
             }
+            Event::Raiders => {
+                let potato_count = state.inventory.count(Item::CookedPotato);
+                let requested = if state.cat.get().is_some() { 100 } else { 70 };
+                let damage = 30;
+                let result = Prompt::show(|p| {
+                    p.page(state.page);
+                    p.text("Raiders came in last night demanding food.");
+                    if state.cat.get().is_some() {
+                        p.text("They even threatened to kill my cat if I didn't comply.");
+                    }
+                    if potato_count < requested {
+                        p.text(format!(
+                            "They demanded {} potatoes, I didn't have that many...",
+                            requested
+                        ));
+                    }
+                    if state.health.current <= damage {
+                        p.add_option("refuse")
+                            .color_text("They shoot you. You die.", RED);
+                    } else {
+                        p.add_option("refuse")
+                            .color_text("Those bastards shot me", RED)
+                            .color_text("<Lost health>", RED);
+                    }
+                    if state.inventory.count(Item::CookedPotato) >= requested {
+                        p.add_option(format!("Give {} potatoes", requested))
+                            .text("I had no choice but to give them the potatoes");
+                    }
+                })
+                .await;
+                match result.index {
+                    1 => Outcome::LoseHealth(damage),
+                    2 => Outcome::LoseItem(Item::CookedPotato, requested),
+                    _ => unreachable!(),
+                }
+            }
             Event::UnlockFarm => {
                 let outcome = Outcome::UnlockFarm;
                 Dialogue::show(|d| {
@@ -104,6 +145,7 @@ pub enum Outcome {
     RenerateHealth(u32),
     GainItem(Item, usize),
     LoseItem(Item, usize),
+    LoseHealth(u32),
     GainCat(bool),
     UnlockFarm,
     SkipDay,
@@ -114,8 +156,8 @@ impl Outcome {
     pub fn dialogue(&self, state: &State, d: &mut Dialogue) {
         match self {
             Outcome::RenerateHealth(health) => {
-                if let Some(count) = state.health.can_add(*health) {
-                    d.color_text(format!("Regained {} health", count), RED);
+                if state.health.can_add(*health).is_some() {
+                    d.color_text("Regained some health", DARKGREEN);
                 }
             }
             Outcome::GainItem(item, n) => {
@@ -138,6 +180,9 @@ impl Outcome {
                     RED,
                 );
             }
+            Outcome::LoseHealth(_) => {
+                d.color_text("<You lost health>", RED);
+            }
             Outcome::GainCat(_) => {}
             Outcome::UnlockFarm => {
                 d.jiggle_color_text("Unlocked farm!", YELLOW);
@@ -153,6 +198,11 @@ impl Outcome {
             Outcome::GainItem(item, count) => state.inventory.add(item, count),
             Outcome::LoseItem(item, count) => state.inventory.remove(item, count),
             Outcome::UnlockFarm => state.farm = Some(Farm::default()),
+            Outcome::LoseHealth(health) => {
+                if !state.health.subn(health) {
+                    state.is_dead = true;
+                }
+            }
             Outcome::SkipDay => {}
             Outcome::Nothing => {}
             Outcome::GainCat(true) => state.cat = CatState::Cat(Cat::default()),

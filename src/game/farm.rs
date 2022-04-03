@@ -7,7 +7,7 @@ use ::rand::Rng;
 use macroquad::prelude::*;
 
 const SIZE: usize = 10;
-const POTATO_MATURE_AGE: u8 = 3;
+const POTATO_MATURE_AGE: u8 = 5;
 const TILE_PX: f32 = 50.;
 const PLAYER_SPEED: f32 = 2.;
 const TOUCH_DISTANCE: f32 = 30.;
@@ -16,36 +16,86 @@ const FARM_START: (usize, usize) = (4, 1);
 
 pub struct Farm {
     pub tiles: [[Tile; SIZE]; SIZE],
+    pub days_since_last_blight: u32,
 }
 
 impl Default for Farm {
     fn default() -> Self {
         let mut farm = Self {
             tiles: Default::default(),
+            days_since_last_blight: 0,
         };
-        farm.tiles[2][2] = Tile::Potato { age: 1 };
-        farm.tiles[2][3] = Tile::Potato { age: 1 };
-        farm.tiles[3][2] = Tile::Potato { age: 1 };
-
-        farm.tiles[6][4] = Tile::Potato { age: 2 };
-        farm.tiles[6][5] = Tile::Potato { age: 2 };
-
-        farm.tiles[8][1] = Tile::Potato { age: 3 };
-        farm.tiles[9][1] = Tile::Potato { age: 3 };
-        farm.tiles[8][2] = Tile::Potato { age: 3 };
-        farm.tiles[9][2] = Tile::Potato { age: 3 };
-
+        let potatoes = [
+            (0, 0, 5),
+            (1, 1, 5),
+            (1, 0, 5),
+            (0, 0, 5),
+            (2, 2, 1),
+            (2, 3, 1),
+            (3, 2, 1),
+            (6, 4, 2),
+            (6, 5, 2),
+            (8, 1, 3),
+            (9, 1, 3),
+            (8, 2, 3),
+            (9, 2, 3),
+        ];
+        for (x, y, age) in potatoes {
+            farm.tiles[x][y] = Tile::Potato { age, blight: false };
+        }
         farm
     }
 }
 
 impl Farm {
-    pub fn end_of_day(&mut self) {
-        for col in self.tiles.iter_mut() {
-            for tile in col.iter_mut() {
-                match tile {
-                    Tile::Potato { age } if *age < POTATO_MATURE_AGE => *age += 1,
-                    _ => {}
+    pub fn end_of_day(&mut self, rng: &mut impl Rng) {
+        let mut has_blight = false;
+        for x in 0..SIZE {
+            for y in 0..SIZE {
+                let tile = &mut self.tiles[x][y];
+                if let Tile::Potato { age, blight } = tile {
+                    if *age < POTATO_MATURE_AGE {
+                        *age += 1;
+                    }
+                    if *blight {
+                        has_blight = true;
+                        self.around_mut(x, y, |tile| {
+                            if let Tile::Potato { blight, .. } = tile {
+                                *blight = true
+                            }
+                        });
+                    }
+                }
+            }
+        }
+        if !has_blight {
+            self.days_since_last_blight += 1;
+        } else {
+            self.days_since_last_blight = 0;
+        }
+
+        if self.days_since_last_blight > 10 && rng.gen_bool(0.1) {
+            'blight_loop: for x in 0..SIZE {
+                for y in 0..SIZE {
+                    if let Tile::Potato { blight, .. } = &mut self.tiles[x][y] {
+                        *blight = true;
+                        break 'blight_loop;
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn around_mut(&mut self, x: usize, y: usize, mut cb: impl FnMut(&mut Tile)) {
+        let min_x = if x == 0 { x } else { x - 1 };
+        let max_x = if x < SIZE - 1 { x + 1 } else { x };
+        let min_y = if y == 0 { y } else { y - 1 };
+        let max_y = if y < SIZE - 1 { y + 1 } else { y };
+
+        for tile_x in min_x..=max_x {
+            for tile_y in min_y..=max_y {
+                if tile_x != x && tile_y != y {
+                    cb(&mut self.tiles[tile_x][tile_y]);
                 }
             }
         }
@@ -55,6 +105,8 @@ impl Farm {
         let mut px = 150.0;
         let mut py = 50.0;
         let mut facing = (0, 1);
+        let start_raw_potatoes =
+            state.inventory.count(Item::RawPotato) + state.inventory.count(Item::RawPotatoBlight);
         loop {
             clear_background(DARKGREEN);
             for x in 0..SIZE {
@@ -101,6 +153,33 @@ impl Farm {
                 py = py.max(min_y).min(screen_height() - 32.);
             }
 
+            let seed_count = state.inventory.count(Item::Seeds);
+            let raw_potato_count = state.inventory.count(Item::RawPotato)
+                + state.inventory.count(Item::RawPotatoBlight);
+
+            draw_text(
+                &format!("Seeds: {}", seed_count),
+                10.,
+                screen_height() - 70.,
+                24.,
+                WHITE,
+            );
+            draw_text(
+                &format!(
+                    "Potatoes: {}{}",
+                    if raw_potato_count > start_raw_potatoes {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    raw_potato_count - start_raw_potatoes
+                ),
+                10.,
+                screen_height() - 50.,
+                24.,
+                WHITE,
+            );
+
             if py < 150. && px < 64. {
                 draw_text_centered(
                     "<Enter> end day",
@@ -110,6 +189,11 @@ impl Farm {
                     WHITE,
                 );
                 if is_key_pressed(KeyCode::Enter) {
+                    return;
+                }
+            } else {
+                draw_text("<Esc> exit", 10., screen_height() - 10., 30., WHITE);
+                if is_key_pressed(KeyCode::Escape) {
                     return;
                 }
             }
@@ -137,9 +221,6 @@ impl Farm {
                 }
             }
 
-            if is_key_pressed(KeyCode::Escape) {
-                crate::quit_dialogue().await;
-            }
             next_frame().await;
         }
     }
@@ -182,7 +263,8 @@ impl Farm {
                 let tile = &self.tiles[x][y];
                 let most_significant_tile = most_significant.as_ref().map(|(_x, _y, tile)| tile);
                 let replace = match (tile, most_significant_tile) {
-                    (Tile::Potato { age }, None) | (Tile::Potato { age }, Some(Tile::Dirt))
+                    (Tile::Potato { age, .. }, None)
+                    | (Tile::Potato { age, .. }, Some(Tile::Dirt))
                         if *age == POTATO_MATURE_AGE =>
                     {
                         true
@@ -200,18 +282,31 @@ impl Farm {
     }
 
     fn execute(&mut self, x: usize, y: usize, state: &mut State) {
-        match &self.tiles[x][y] {
-            Tile::Potato { age: 3 } => {
+        match self.tiles[x][y].clone() {
+            Tile::Potato {
+                age: POTATO_MATURE_AGE,
+                blight,
+            } => {
                 let potato_count = if state.rng.gen_bool(0.5) { 3 } else { 2 };
                 let seed_count = if state.rng.gen_bool(0.5) { 2 } else { 1 };
-                state.inventory.add(Item::RawPotato, potato_count);
+                state.inventory.add(
+                    if blight {
+                        Item::RawPotatoBlight
+                    } else {
+                        Item::RawPotato
+                    },
+                    potato_count,
+                );
                 state.inventory.add(Item::Seeds, seed_count);
 
                 self.tiles[x][y] = Tile::Dirt;
             }
             Tile::Dirt if state.inventory.count(Item::Seeds) > 0 => {
                 if state.inventory.try_remove(Item::Seeds, 1) {
-                    self.tiles[x][y] = Tile::Potato { age: 0 };
+                    self.tiles[x][y] = Tile::Potato {
+                        age: 0,
+                        blight: false,
+                    };
                 }
             }
             tile => {
@@ -221,10 +316,10 @@ impl Farm {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Tile {
     Dirt,
-    Potato { age: u8 },
+    Potato { age: u8, blight: bool },
 }
 
 impl Default for Tile {
@@ -237,12 +332,17 @@ impl Tile {
     pub fn draw_at(&self, x: f32, y: f32) {
         match self {
             Self::Dirt => draw_rectangle(x, y, TILE_PX, TILE_PX, BROWN),
-            Self::Potato { age } => {
+            Self::Potato { age, .. } => {
                 draw_rectangle(x, y, TILE_PX, TILE_PX, BROWN);
                 let height = *age as f32 * 3.;
+                let color = if *age == POTATO_MATURE_AGE {
+                    Color::new(0.701, 0.890, 0.0, 1.0)
+                } else {
+                    GREEN
+                };
                 for (dx, dy) in [(15., 20.), (45., 20.), (30., 30.)] {
                     draw_rectangle(x + dx - 1., y + dy - 1., 5.0, 5.0, DARKBROWN);
-                    draw_rectangle(x + dx, y + dy - height, 3.0, height, GREEN);
+                    draw_rectangle(x + dx, y + dy - height, 3.0, height, color);
                 }
             }
         }
@@ -250,7 +350,10 @@ impl Tile {
 
     pub fn action_name(&self) -> Option<&str> {
         match self {
-            Self::Potato { age: 3 } => Some("harvest potato"),
+            Self::Potato {
+                age: POTATO_MATURE_AGE,
+                ..
+            } => Some("harvest potato"),
             Self::Dirt => Some("plant potato"),
             _ => None,
         }

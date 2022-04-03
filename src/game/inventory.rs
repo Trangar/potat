@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 pub enum Item {
     Seeds,
     RawPotato,
+    RawPotatoBlight,
     CookedPotato,
     CanOfBeans,
 }
@@ -12,7 +13,7 @@ impl Item {
     pub fn name(&self) -> &str {
         match self {
             Self::Seeds => "Potato seeds",
-            Self::RawPotato => "Raw potato",
+            Self::RawPotato | Self::RawPotatoBlight => "Raw potato",
             Self::CookedPotato => "Cooked potato",
             Self::CanOfBeans => "Can of beans",
         }
@@ -20,7 +21,7 @@ impl Item {
     pub fn name_one(&self) -> &str {
         match self {
             Self::Seeds => "potato seed",
-            Self::RawPotato => "raw potato",
+            Self::RawPotato | Self::RawPotatoBlight => "raw potato",
             Self::CookedPotato => "cooked potato",
             Self::CanOfBeans => "can of beans",
         }
@@ -28,10 +29,18 @@ impl Item {
     pub fn name_multiple(&self) -> &str {
         match self {
             Self::Seeds => "potato seeds",
-            Self::RawPotato => "raw potatos",
+            Self::RawPotato | Self::RawPotatoBlight => "raw potatos",
             Self::CookedPotato => "cooked potatos",
             Self::CanOfBeans => "cans of beans",
         }
+    }
+
+    pub fn is_cookable(&self) -> bool {
+        matches!(self, Self::RawPotato | Self::RawPotatoBlight)
+    }
+
+    pub fn is_edible(&self) -> bool {
+        matches!(self, Self::CookedPotato | Self::CanOfBeans)
     }
 }
 
@@ -62,8 +71,22 @@ impl Inventory {
         !self.items.is_empty()
     }
 
-    pub fn items(&self) -> impl Iterator<Item = &(Item, usize)> + '_ {
-        self.items.iter()
+    pub fn items(&self) -> impl Iterator<Item = (Item, usize)> + '_ {
+        // we need to compress blight and non-blight potatoes
+        let blight_potato_count = self.count(Item::RawPotatoBlight);
+        let raw_potato_count = self.count(Item::RawPotato);
+        self.items
+            .iter()
+            .cloned()
+            .filter_map(move |(item, count)| match item {
+                Item::RawPotato => Some((item, count + blight_potato_count)),
+                // if we have no raw potatoes, we return the blight potatoes as raw instead
+                Item::RawPotatoBlight if raw_potato_count == 0 => {
+                    Some((Item::RawPotato, blight_potato_count))
+                }
+                Item::RawPotatoBlight => None,
+                _ => Some((item, count)),
+            })
     }
 
     pub fn count(&self, item: Item) -> usize {
@@ -88,16 +111,21 @@ impl Inventory {
                 self.items.push((Item::CookedPotato, potatoes));
             }
         }
+        self.remove_all(Item::RawPotatoBlight);
     }
 
     pub fn has_edibles(&self) -> bool {
-        self.items
-            .iter()
-            .any(|(i, _)| matches!(i, Item::CookedPotato))
+        self.items.iter().any(|(i, _)| i.is_edible())
     }
 
     pub fn has_cookables(&self) -> bool {
-        self.items.iter().any(|(i, _)| matches!(i, Item::RawPotato))
+        self.items.iter().any(|(i, _)| i.is_cookable())
+    }
+
+    pub fn remove_all(&mut self, item: Item) {
+        if let Some(idx) = self.items.iter().position(|(i, _)| i == &item) {
+            self.items.remove(idx);
+        }
     }
 
     pub fn remove(&mut self, item: Item, count: usize) {

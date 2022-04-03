@@ -23,8 +23,10 @@ pub struct State {
     pub start_page: u32,
     pub page: u32,
     pub health: Stat,
+    pub is_dead: bool,
     pub food: Stat,
     pub cat: CatState,
+    pub last_cook_had_blight: bool,
     pub farm: Option<Farm>,
 }
 
@@ -34,10 +36,12 @@ impl State {
             rng: Box::new(thread_rng()),
             start_page,
             page: start_page,
+            is_dead: false,
             inventory: Inventory::default(),
             health: Stat::new(50),
             food: Stat::new(100),
             cat: CatState::NotVisited,
+            last_cook_had_blight: false,
             farm: None,
         }
     }
@@ -53,8 +57,9 @@ impl State {
         } else {
             self.food.subn(food_count);
         }
+
         if let Some(farm) = &mut self.farm {
-            farm.end_of_day();
+            farm.end_of_day(&mut self.rng);
         }
     }
 
@@ -94,8 +99,9 @@ impl State {
             if self.inventory.has_items() {
                 draw_text("Inventory", x, y, 30., WHITE);
                 y += 40.;
+
                 for (item, count) in self.inventory.items() {
-                    if *count == 0 {
+                    if count == 0 {
                         draw_text(item.name(), x, y, 24., WHITE);
                     } else {
                         draw_text(&format!("{}: {}", item.name(), count), x, y, 24., WHITE);
@@ -111,25 +117,8 @@ impl State {
             if self.inventory.has_cookables() && last_event.can_execute_action() {
                 draw_text("<C> cook", 450., screen_height() - 50., 24., WHITE);
                 if is_key_pressed(KeyCode::C) {
-                    let potatoes = self.inventory.count(Item::RawPotato);
-                    Dialogue::show(|d| {
-                        d.page(self.page);
-                        d.text("I decided to spend the day cooking");
-                        d.text("");
-                        match potatoes {
-                            0 => {}
-                            1 => {
-                                d.text("I only had a single potato...");
-                            }
-                            n => {
-                                d.text(format!("I counted a total of {} potatoes", n));
-                            }
-                        }
-                        d.text("");
-                        d.text("The house smelled amazing.");
-                    })
-                    .await;
-                    self.inventory.cook_all();
+                    self.cook().await;
+
                     return DayAction::Next;
                 }
             }
@@ -152,6 +141,43 @@ impl State {
             next_frame().await;
         }
     }
+
+    async fn cook(&mut self) {
+        let potatoes = self.inventory.count(Item::RawPotato);
+        let blight_potatoes = self.inventory.count(Item::RawPotatoBlight);
+        Dialogue::show(|d| {
+            d.page(self.page);
+            d.text("I decided to spend the day cooking");
+            d.text("");
+            match potatoes {
+                0 => {}
+                1 => {
+                    d.text("I only had a single potato...");
+                }
+                n => {
+                    d.text(format!("I counted a total of {} potatoes", n));
+                }
+            }
+            d.text("");
+            if blight_potatoes > 0 {
+                if self.last_cook_had_blight {
+                    d.text("I found even more blight on my potatoes...");
+                } else {
+                    d.jiggle_color_text("THERE WAS BLIGHT ON MY POTATOES", RED);
+                    d.text("This is terrible.");
+                    d.text("Blight is almost impossible to detect and spreads between plants.");
+                    d.text("My entire crop could be ruined.");
+                    d.text("What will I do...");
+                }
+                d.text(format!("<Lost {} potatoes to blight>", blight_potatoes));
+            } else {
+                d.text("The house smelled amazing.");
+            }
+        })
+        .await;
+        self.last_cook_had_blight = blight_potatoes > 0;
+        self.inventory.cook_all();
+    }
 }
 
 pub enum DayAction {
@@ -159,6 +185,7 @@ pub enum DayAction {
     Next,
 }
 
+#[derive(Debug)]
 pub struct Stat {
     pub current: u32,
     pub max: u32,

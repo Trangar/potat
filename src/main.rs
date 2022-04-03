@@ -4,43 +4,69 @@ mod game;
 
 use assets::Assets;
 use dialogue::{Dialogue, DialogueBuilder, DialogueOpts, Event, FrameCtx};
-use game::{DayAction, Item, State};
+use game::{DayAction, Farm, Item, State};
 use macroquad::prelude::*;
 
 #[macroquad::main("Potat")]
 async fn main() {
     let assets = Assets::new().await;
 
-    #[cfg(not(debug_assertions))]
-    let mut state = intro().await;
-    #[cfg(debug_assertions)]
-    let mut state = loop {
-        clear_background(BLACK);
-        next_frame().await;
-        if is_key_pressed(KeyCode::Enter) {
-            break intro().await;
-        }
-        if is_key_pressed(KeyCode::F1) {
-            let mut state = State::new(5);
-            state.inventory.add(Item::Seeds, 10);
-            state.page = 7;
-            break state;
-        }
-    };
+    'restart: loop {
+        #[cfg(not(debug_assertions))]
+        let mut state = intro().await;
+        #[cfg(not(debug_assertions))]
+        let mut first_event = None;
 
-    loop {
-        let event = game::next_event(&state);
-        event.dialogue(&mut state).await;
-        match state.draw(event, &assets).await {
-            DayAction::Farm => {
-                if let Some(mut farm) = state.farm.take() {
-                    farm.draw(&mut state, &assets).await;
-                    state.farm = Some(farm);
+        #[cfg(debug_assertions)]
+        let (mut state, mut first_event) = loop {
+            clear_background(BLACK);
+            next_frame().await;
+            if is_key_pressed(KeyCode::Enter) {
+                break (intro().await, None);
+            }
+            if is_key_pressed(KeyCode::F1) {
+                let mut state = State::new(1);
+                state.inventory.add(Item::Seeds, 10);
+                state.farm = Some(Farm::default());
+                state.page = 8;
+                break (state, None);
+            }
+        };
+
+        loop {
+            let event = first_event
+                .take()
+                .unwrap_or_else(|| game::next_event(&state));
+            event.dialogue(&mut state).await;
+            if state.is_dead {
+                loop {
+                    next_frame().await;
+                    clear_background(BLACK);
+                    draw_text_centered("You died", screen_width() / 2.0, 50., 50., WHITE);
+                    draw_text(
+                        &format!("Survived {} days", state.page),
+                        50.,
+                        100.,
+                        24.,
+                        WHITE,
+                    );
+                    draw_text("<Enter> restart", 50., screen_height() - 50., 30., WHITE);
+                    if is_key_pressed(KeyCode::Enter) {
+                        continue 'restart;
+                    }
                 }
             }
-            DayAction::Next => {}
+            match state.draw(event, &assets).await {
+                DayAction::Farm => {
+                    if let Some(mut farm) = state.farm.take() {
+                        farm.draw(&mut state, &assets).await;
+                        state.farm = Some(farm);
+                    }
+                }
+                DayAction::Next => {}
+            }
+            state.end_of_day();
         }
-        state.end_of_day();
     }
 }
 
